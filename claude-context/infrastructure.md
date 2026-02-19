@@ -46,7 +46,7 @@ export { table, kbBucket };
 ```
 
 **Todos:**
-- [ ] No GSI defined — the table only supports direct key lookups. Queries like "all bookings at Restaurant X" or "bookings on date Y" require a full table scan. Add a GSI with `restaurant_name` as hash key and `date` as range key:
+- [x] No GSI defined — the table only supports direct key lookups. Queries like "all bookings at Restaurant X" or "bookings on date Y" require a full table scan. Add a GSI with `restaurant_name` as hash key and `date` as range key:
   ```typescript
   globalIndexes: {
     ByRestaurantDate: {
