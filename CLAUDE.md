@@ -19,19 +19,19 @@ All three are deployed as a single unit via SST.
 
 ## Current State
 
-The repository is currently at the **starting scaffold** stage — the SST monorepo template has been initialized but not yet adapted for the restaurant agent. The target architecture and migration plan are documented in `project.MD`. Implementation follows the phases described there.
+The repository is currently at the **starting scaffold** stage — the SST monorepo template has been initialized but not yet adapted for the restaurant agent. The target architecture and migration plan are documented in `claude-context/project.MD`. Implementation follows the phases described there.
 
 Current structure (template defaults, not yet modified):
 - `sst.config.ts` — SST entry point (generic template, not yet restaurant-specific)
 - `infra/api.ts` / `infra/storage.ts` — placeholder infra (to be replaced)
 - `packages/core/`, `packages/functions/`, `packages/scripts/` — SST template packages (to be replaced by `apps/web/` and `backend/`)
-- `package.json` — uses **npm workspaces**; project.MD recommends migrating to **pnpm workspaces**
+- `package.json` — uses **npm workspaces**; `claude-context/project.MD` recommends migrating to **pnpm workspaces**
 
 ---
 
 ## Target Architecture
 
-Read `project.MD` in full before making significant changes. Below is a condensed summary.
+Read `claude-context/project.MD` in full before making significant changes. Below is a condensed summary.
 
 ### AWS Services
 
@@ -72,7 +72,10 @@ KB_ID      = Resource.RestaurantKB.id
 restaurant-booking-agent/
 │
 ├── CLAUDE.md
-├── project.MD                      # Architecture analysis and migration plan
+├── claude-context/                 # Architecture analysis and reference docs
+│   ├── project.MD                  # Migration plan and SST snippets
+│   ├── architecture.MD             # Design decisions and open issues
+│   └── infrastructure.md           # Per-resource SST snippets with todo lists
 ├── sst.config.ts                   # SST entry point — imports infra modules
 ├── package.json                    # pnpm workspaces + Turborepo
 ├── pnpm-workspace.yaml             # apps/*, infra (backend excluded — managed by uv)
@@ -164,7 +167,7 @@ Implement in order. Each phase is a prerequisite for the next.
 - Update `sst.config.ts` to use dynamic imports of all infra modules
 
 ### Phase 1 — Infrastructure as Code
-- Implement all infra modules (see `project.MD` for complete Pulumi/SST snippets)
+- Implement all infra modules (see `claude-context/infrastructure.md` for per-resource SST snippets and open todos)
 - VPC + OSS VPC endpoint in `infra/networking.ts`
 - DynamoDB + S3 bucket in `infra/storage.ts`
 - IAM role, OSS collection/policies, KB, data source, `sst.Linkable.wrap()` in `infra/ai.ts`
