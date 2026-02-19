@@ -86,8 +86,7 @@ restaurant-booking-agent/
 │   ├── networking.ts               # VPC + OSS VPC endpoint
 │   ├── storage.ts                  # DynamoDB table + S3 bucket
 │   ├── ai.ts                       # IAM role, OSS, KB, data source, Linkable.wrap()
-│   ├── api.ts                      # Lambda function, link: [...]
-│   └── web.ts                      # Next.js deployment
+│   └── api.ts                      # API Gateway + Lambda functions, link: [...]
 │
 ├── apps/
 │   └── web/                        # Next.js frontend
@@ -151,7 +150,8 @@ restaurant-booking-agent/
 
 ### AWS / Infrastructure
 - **Pulumi `aws` provider** (classic) — all raw Pulumi resources; do not use `aws-native`
-- **SST v3** — first-class components: `sst.aws.Dynamo`, `sst.aws.Bucket`, `sst.aws.Function`, `sst.aws.Nextjs`, `sst.aws.Vpc`
+- **SST v3** — first-class components: `sst.aws.Dynamo`, `sst.aws.Bucket`, `sst.aws.Function`, `sst.aws.ApiGatewayV2`, `sst.aws.Vpc`
+- **Vercel** — Next.js frontend hosting; deployed independently from the SST stack
 
 ---
 
@@ -163,7 +163,7 @@ Implement in order. Each phase is a prerequisite for the next.
 - Replace `packages/` SST template layout with `apps/web/` + `backend/`
 - Migrate from npm workspaces to pnpm + Turborepo
 - Add `pnpm-workspace.yaml`, `turbo.json`
-- Restructure `infra/` into `networking.ts`, `storage.ts`, `ai.ts`, `api.ts`, `web.ts`
+- Restructure `infra/` into `networking.ts`, `storage.ts`, `ai.ts`, `api.ts`
 - Update `sst.config.ts` to use dynamic imports of all infra modules
 
 ### Phase 1 — Infrastructure as Code
@@ -181,10 +181,11 @@ Implement in order. Each phase is a prerequisite for the next.
 - `agent.py` factory with all tools registered
 - POST /chat route with SSE streaming
 
-### Phase 3 — Frontend (Next.js)
+### Phase 3 — Frontend (Next.js on Vercel)
 - Implement `apps/web/` Next.js app
 - Chat UI components
 - Generate `lib/api.ts` client from FastAPI OpenAPI spec
+- Deploy via Vercel; set `NEXT_PUBLIC_API_URL` to the API Gateway URL in Vercel's environment settings
 
 ### Phase 4 — Observability
 - Structured JSON logging with correlation IDs

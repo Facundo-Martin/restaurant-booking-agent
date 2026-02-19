@@ -179,6 +179,7 @@ The table schema (PK: `booking_id`, SK: `restaurant_name`) supports direct key l
 | Decision | Current | Recommended | Status |
 |---|---|---|---|
 | API exposure | Lambda Function URL | API Gateway HTTP API + authorizer | **Decided: API Gateway HTTP API** |
+| Frontend hosting | `sst.aws.Nextjs` | Vercel — better DX, preview URLs, free tier | **Decided: Vercel** |
 | Streaming | SSE via Mangum | Lambda Response Streaming or ECS Fargate | Unresolved — deferred |
 | Stage-aware naming | Hard-coded `"restaurant-assistant"` | Derived from `$app.name`+`$app.stage` | Not yet addressed |
 | Vector store | OSS ~$345/month (always-on) | OSS with `removal: "remove"` — tear down when idle; Aurora Serverless v2 + pgvector if always-on needed | **Decided: keep OSS, tear down when idle** |
