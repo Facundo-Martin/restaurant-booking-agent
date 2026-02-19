@@ -1,9 +1,9 @@
 {
-  "name": "@monorepo-template/scripts",
+  "name": "@restaurant-booking-agent/scripts",
   "version": "0.0.0",
   "type": "module",
   "dependencies": {
-    "@monorepo-template/core": "*",
+    "@restaurant-booking-agent/core": "*",
     "sst": "*"
   },
   "scripts": {
