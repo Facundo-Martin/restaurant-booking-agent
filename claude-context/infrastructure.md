@@ -26,7 +26,7 @@ export { vpc, ossVpcEndpoint };
 ```
 
 **Todos:**
-- [ ] `securityGroupIds` is empty on `ossVpcEndpoint` — create a dedicated security group allowing TCP 443 inbound only from within the VPC (or scoped to Bedrock's service-plane CIDR if deterministic), and attach it here
+- [x] `securityGroupIds` is empty on `ossVpcEndpoint` — create a dedicated security group allowing TCP 443 inbound only from within the VPC (or scoped to Bedrock's service-plane CIDR if deterministic), and attach it here
 
 ---
 
