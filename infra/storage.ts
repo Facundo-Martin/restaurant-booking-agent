@@ -4,7 +4,7 @@ import { vpc } from "./networking";
 const kbBucket = new sst.aws.Bucket("KbDocuments");
 
 // Aurora Serverless v2 cluster — vector store backing the Bedrock Knowledge Base via pgvector
-const aurora = new sst.aws.Aurora("VectorStore", {
+const rds = new sst.aws.Aurora("VectorStore", {
   engine: "postgres",
   dataApi: true, // required for Bedrock KnowledgeBase to access RDS
   vpc,
@@ -34,4 +34,4 @@ const table = new sst.aws.Dynamo("Bookings", {
   },
 });
 
-export { table, kbBucket, aurora };
+export { table, kbBucket, rds };

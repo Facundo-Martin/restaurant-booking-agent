@@ -1,4 +1,4 @@
-import { aurora, kbBucket } from "./storage";
+import { rds, kbBucket } from "./storage";
 
 // IAM role that Bedrock assumes to read documents from S3 and write embeddings to the vector store
 const kbExecutionRole = new aws.iam.Role("KbExecutionRole", {
@@ -29,7 +29,9 @@ const kbExecutionRole = new aws.iam.Role("KbExecutionRole", {
               Sid: "BedrockInvokeEmbeddingModel",
               Effect: "Allow",
               Action: ["bedrock:InvokeModel"],
-              Resource: [`arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`],
+              Resource: [
+                `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`,
+              ],
             },
           ],
         }),
@@ -55,7 +57,7 @@ const kbExecutionRole = new aws.iam.Role("KbExecutionRole", {
     {
       // Allows Bedrock to query Aurora via the RDS Data API and read the credentials secret
       name: "KnowledgeBaseRDSAccessPolicy",
-      policy: $resolve([aurora.clusterArn, aurora.secretArn]).apply(
+      policy: $resolve([rds.clusterArn, rds.secretArn]).apply(
         ([clusterArn, secretArn]) =>
           JSON.stringify({
             Version: "2012-10-17",
@@ -109,10 +111,10 @@ const knowledgeBase = new aws.bedrock.AgentKnowledgeBase(
     storageConfiguration: {
       type: "RDS",
       rdsConfiguration: {
-        resourceArn: aurora.clusterArn,
+        resourceArn: rds.clusterArn,
         databaseName: "postgres",
         tableName: "bedrock_integration.bedrock_kb",
-        credentialsSecretArn: aurora.secretArn,
+        credentialsSecretArn: rds.secretArn,
         fieldMapping: {
           primaryKeyField: "id",
           vectorField: "embedding",
