@@ -1,4 +1,17 @@
-// Stores restaurant reservations — SST handles encryption and least-privilege IAM automatically
+import { vpc } from "./networking";
+
+// Holds the .docx source files that Bedrock ingests into the Knowledge Base
+const kbBucket = new sst.aws.Bucket("KbDocuments");
+
+// Aurora Serverless v2 cluster — vector store backing the Bedrock Knowledge Base via pgvector
+const aurora = new sst.aws.Aurora("VectorStore", {
+  engine: "postgres",
+  dataApi: true, // required for Bedrock KnowledgeBase to access RDS
+  vpc,
+  scaling: { min: "0.5 ACU", max: "4 ACU" },
+});
+
+// Stores restaurant reservations
 const table = new sst.aws.Dynamo("Bookings", {
   fields: {
     booking_id: "string",
@@ -21,7 +34,4 @@ const table = new sst.aws.Dynamo("Bookings", {
   },
 });
 
-// Holds the .docx source files that Bedrock ingests into the Knowledge Base
-const kbBucket = new sst.aws.Bucket("KbDocuments");
-
-export { table, kbBucket };
+export { table, kbBucket, aurora };
