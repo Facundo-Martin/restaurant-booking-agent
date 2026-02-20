@@ -12,12 +12,13 @@ export default $config({
   async run() {
     await import("./infra/networking");
     await import("./infra/storage");
-    await import("./infra/ai");
+    const ai = await import("./infra/ai");
     const api = await import("./infra/api");
 
     // Set NEXT_PUBLIC_API_URL in Vercel using this output
     return {
       ApiUrl: api.url,
+      KbId: ai.knowledgeBase.id,
     };
   },
 });
