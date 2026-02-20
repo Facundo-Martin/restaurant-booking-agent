@@ -26,7 +26,7 @@ export { vpc, ossVpcEndpoint };
 ```
 
 **Todos:**
-- [ ] `securityGroupIds` is empty on `ossVpcEndpoint` — create a dedicated security group allowing TCP 443 inbound only from within the VPC (or scoped to Bedrock's service-plane CIDR if deterministic), and attach it here
+- [x] `securityGroupIds` is empty on `ossVpcEndpoint` — create a dedicated security group allowing TCP 443 inbound only from within the VPC (or scoped to Bedrock's service-plane CIDR if deterministic), and attach it here
 
 ---
 
@@ -46,7 +46,7 @@ export { table, kbBucket };
 ```
 
 **Todos:**
-- [ ] No GSI defined — the table only supports direct key lookups. Queries like "all bookings at Restaurant X" or "bookings on date Y" require a full table scan. Add a GSI with `restaurant_name` as hash key and `date` as range key:
+- [x] No GSI defined — the table only supports direct key lookups. Queries like "all bookings at Restaurant X" or "bookings on date Y" require a full table scan. Add a GSI with `restaurant_name` as hash key and `date` as range key:
   ```typescript
   globalIndexes: {
     ByRestaurantDate: {
@@ -191,12 +191,12 @@ new aws.opensearch.ServerlessAccessPolicy("OssDataAccess", {
 ```
 
 **Todos:**
-- [ ] All resource names are hard-coded string literals (`"restaurant-assistant"`, `"restaurant-assistant-enc"`, etc.) — deploying a second stage in the same account will conflict. Derive names from the SST stage:
+- [x] All resource names are hard-coded string literals (`"restaurant-assistant"`, `"restaurant-assistant-enc"`, etc.) — deploying a second stage in the same account will conflict. Derive names from the SST stage:
   ```typescript
   const collectionName = `${$app.name}-${$app.stage}`;
   ```
   Then use `collectionName` everywhere instead of the literal string
-- [ ] `OssDataAccess` only lists `kbExecutionRole.arn` as a principal — no operator or CI role can inspect index contents or debug ingestion. Add the deployer's IAM role (or a dedicated ops role) as a second principal with at minimum `aoss:DescribeIndex` and `aoss:ReadDocument`
+- [x] `OssDataAccess` only lists `kbExecutionRole.arn` as a principal — no operator or CI role can inspect index contents or debug ingestion. Add the deployer's IAM role (or a dedicated ops role) as a second principal with at minimum `aoss:DescribeIndex` and `aoss:ReadDocument`
 - [ ] The vector index is configured with `"number_of_replicas": 0` — no redundancy. Set to `1` for any non-ephemeral environment
 - [ ] OSS bills a baseline of 2 OCUs (indexing) + 2 OCUs (search) regardless of traffic — approximately **$345/month** at zero queries. For dev/staging: share one collection across stages using separate index names per stage, relying on `removal: "remove"` to tear it down between sessions. Alternative: Aurora Serverless v2 + pgvector (~$46/month minimum, scales to zero) — Bedrock KB supports both with no agent code changes
 
@@ -258,9 +258,9 @@ export { knowledgeBase };
 ```
 
 **Todos:**
-- [ ] `dependsOn: [kbExecutionRole]` is incomplete — KB creation also requires the OSS collection to be in `ACTIVE` state. Change to `dependsOn: [kbExecutionRole, ossCollection]`
+- [x] `dependsOn: [kbExecutionRole]` is incomplete — KB creation also requires the OSS collection to be in `ACTIVE` state. Change to `dependsOn: [kbExecutionRole, ossCollection]`
 - [ ] KB ingestion is never triggered after deploy — uploading `.docx` files to S3 does not automatically sync the KB. Without an ingestion run the KB has zero embeddings and `retrieve()` returns nothing. Add a post-deploy trigger: an `aws.bedrock.AgentDataSourceIngestionJob` resource (or a Pulumi dynamic resource calling the SDK) that starts a sync job after `s3DataSource` is created
-- [ ] `$resolve(kbBucket.arn).apply((arn) => arn)` in `s3DataSource` is a no-op — it resolves an SST Output to a Pulumi Output and returns it unchanged. Replace with `$resolve(kbBucket.arn)` directly
+- [x] `$resolve(kbBucket.arn).apply((arn) => arn)` in `s3DataSource` is a no-op — it resolves an SST Output to a Pulumi Output and returns it unchanged. Replace with `$resolve(kbBucket.arn)` directly
 
 ---
 
