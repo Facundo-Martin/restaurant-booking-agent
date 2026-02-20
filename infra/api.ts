@@ -1,5 +1,4 @@
 import { table, kbBucket } from "./storage";
-import { knowledgeBase } from "./ai";
 
 const api = new sst.aws.ApiGatewayV2("RestaurantApi", {
   // TODO: Restrict to the Vercel domain once it's known (e.g. https://my-app.vercel.app)
@@ -12,7 +11,8 @@ api.route("POST /chat", {
   runtime: "python3.11",
   timeout: "120 seconds",
   memory: "1024 MB",
-  link: [table, kbBucket, knowledgeBase],
+  // TODO: Re-add knowledgeBase to link once it is re-provisioned with Aurora RDS storage
+  link: [table, kbBucket],
   permissions: [{
     actions: ["bedrock:InvokeModel"],
     resources: ["arn:aws:bedrock:*::foundation-model/anthropic.claude-3-7-sonnet-*"],
