@@ -149,7 +149,7 @@ sst.Linkable.wrap(aws.bedrock.AgentKnowledgeBase, (kb) => ({
   properties: { id: kb.id, arn: kb.arn, name: kb.name },
   include: [
     sst.aws.permission({
-      actions: ["bedrock:Retrieve", "bedrock:RetrieveAndGenerate"],
+      actions: ["bedrock:Retrieve"],
       resources: [kb.arn],
     }),
   ],

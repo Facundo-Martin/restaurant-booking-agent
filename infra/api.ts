@@ -1,4 +1,4 @@
-import { table, kbBucket } from "./storage";
+import { table } from "./storage";
 import { knowledgeBase } from "./ai";
 
 const api = new sst.aws.ApiGatewayV2("RestaurantApi", {
@@ -12,7 +12,7 @@ api.route("POST /chat", {
   runtime: "python3.11",
   timeout: "120 seconds",
   memory: "1024 MB",
-  link: [table, kbBucket, knowledgeBase],
+  link: [table, knowledgeBase],
   permissions: [{
     actions: ["bedrock:InvokeModel"],
     resources: ["arn:aws:bedrock:*::foundation-model/anthropic.claude-3-7-sonnet-*"],
