@@ -1,8 +1,42 @@
-// TODO: Create API Gateway HTTP API (sst.aws.ApiGatewayV2) with CORS enabled for the Vercel domain
-// TODO: Add POST /chat route (RestaurantChat function — 120s, 1024MB, linked to table + kbBucket + knowledgeBase + bedrock:InvokeModel)
-// TODO: Add GET /bookings/{id} route (RestaurantBookings function — 10s, 256MB, linked to table only)
-// TODO: Add DELETE /bookings/{id} route (same RestaurantBookings function config)
-// TODO: Attach WAF (aws.wafv2.WebAcl) with AWSManagedRulesCommonRuleSet and per-IP rate limit
-// TODO: Export url
+import { table, kbBucket } from "./storage";
+import { knowledgeBase } from "./ai";
 
-export {};
+const api = new sst.aws.ApiGatewayV2("RestaurantApi", {
+  // TODO: Restrict to the Vercel domain once it's known (e.g. https://my-app.vercel.app)
+  cors: { allowOrigins: ["*"], allowMethods: ["GET", "POST", "DELETE"], allowHeaders: ["*"] },
+});
+
+// Handles multi-turn agent conversations — sized for multiple Bedrock round trips
+api.route("POST /chat", {
+  handler: "backend/app/handler_chat.handler",
+  runtime: "python3.11",
+  timeout: "120 seconds",
+  memory: "1024 MB",
+  link: [table, kbBucket, knowledgeBase],
+  permissions: [{
+    actions: ["bedrock:InvokeModel"],
+    resources: ["arn:aws:bedrock:*::foundation-model/anthropic.claude-3-7-sonnet-*"],
+  }],
+});
+
+// Simple DynamoDB reads/deletes — minimal resources, no Bedrock access needed
+api.route("GET /bookings/{id}", {
+  handler: "backend/app/handler_bookings.handler",
+  runtime: "python3.11",
+  timeout: "10 seconds",
+  memory: "256 MB",
+  link: [table],
+});
+
+api.route("DELETE /bookings/{id}", {
+  handler: "backend/app/handler_bookings.handler",
+  runtime: "python3.11",
+  timeout: "10 seconds",
+  memory: "256 MB",
+  link: [table],
+});
+
+// TODO: Attach WAF (aws.wafv2.WebAcl) with AWSManagedRulesCommonRuleSet and a per-IP rate-based rule
+// TODO: Add authorizer to all routes once the user model is defined
+
+export const url = api.url;

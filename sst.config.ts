@@ -17,7 +17,7 @@ export default $config({
 
     // Set NEXT_PUBLIC_API_URL in Vercel using this output
     return {
-      // ApiUrl: api.url,
+      ApiUrl: api.url,
     };
   },
 });
