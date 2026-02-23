@@ -91,8 +91,30 @@ const kbExecutionRole = new aws.iam.Role("KbExecutionRole", {
   ],
 });
 
+// Initialize pgvector schema in Aurora via the RDS Data API — no tunnel or bastion needed.
+// Data API is accessible directly from the deployer's machine with IAM credentials.
+// All statements use IF NOT EXISTS so this is idempotent across re-deploys.
+const initSchema = new command.local.Command(
+  "InitDbSchema",
+  {
+    create: $resolve([rds.clusterArn, rds.secretArn, rds.database]).apply(
+      ([clusterArn, secretArn, database]) => {
+        const exec = (sql: string) =>
+          `aws rds-data execute-statement --resource-arn ${clusterArn} --secret-arn ${secretArn} --database ${database} --sql "${sql}" --profile iamadmin-general --region us-east-1`;
+        return [
+          exec("CREATE EXTENSION IF NOT EXISTS vector"),
+          exec("CREATE SCHEMA IF NOT EXISTS bedrock_integration"),
+          exec("CREATE TABLE IF NOT EXISTS bedrock_integration.bedrock_kb (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), embedding vector(1024), chunks text NOT NULL, metadata json NOT NULL, custom_metadata jsonb)"),
+          exec("CREATE INDEX IF NOT EXISTS bedrock_kb_embedding_idx ON bedrock_integration.bedrock_kb USING hnsw (embedding vector_cosine_ops) WITH (ef_construction=256)"),
+          exec("CREATE INDEX IF NOT EXISTS bedrock_kb_chunks_idx ON bedrock_integration.bedrock_kb USING gin (to_tsvector('simple', chunks))"),
+          exec("CREATE INDEX IF NOT EXISTS bedrock_kb_custom_metadata_idx ON bedrock_integration.bedrock_kb USING gin (custom_metadata)"),
+        ].join(" &&\n");
+      },
+    ),
+  },
+);
+
 // Bedrock Knowledge Base — backed by Aurora + pgvector instead of OSS
-// Aurora must already have the pgvector schema applied (see scripts/init-db.sql) before this deploys
 const knowledgeBase = new aws.bedrock.AgentKnowledgeBase(
   "RestaurantKB",
   {
@@ -113,7 +135,7 @@ const knowledgeBase = new aws.bedrock.AgentKnowledgeBase(
       type: "RDS",
       rdsConfiguration: {
         resourceArn: rds.clusterArn,
-        databaseName: "postgres",
+        databaseName: rds.database,
         tableName: "bedrock_integration.bedrock_kb",
         credentialsSecretArn: rds.secretArn,
         fieldMapping: {
@@ -125,7 +147,7 @@ const knowledgeBase = new aws.bedrock.AgentKnowledgeBase(
       },
     },
   },
-  { dependsOn: [kbExecutionRole] },
+  { dependsOn: [kbExecutionRole, initSchema] },
 );
 
 // S3 data source — tells Bedrock where to find documents and how to chunk them before embedding
@@ -152,7 +174,7 @@ sst.Linkable.wrap(aws.bedrock.AgentKnowledgeBase, (kb) => ({
   properties: { id: kb.id, arn: kb.arn, name: kb.name },
   include: [
     sst.aws.permission({
-      actions: ["bedrock:Retrieve"],
+      actions: ["bedrock:RetrieveAndGenerate", "bedrock:Retrieve"],
       resources: [kb.arn],
     }),
   ],

@@ -19,20 +19,13 @@ export default $config({
   async run() {
     await import("./infra/networking");
     const { rds } = await import("./infra/storage");
-    // Commented out until Aurora pgvector schema is initialized.
-    // Run `npx sst tunnel` then execute scripts/init-db.sql, then re-enable these.
-    // const ai = await import("./infra/ai");
+    const ai = await import("./infra/ai");
+    // api.ts remains commented until backend/ Python handlers are implemented
     // const api = await import("./infra/api");
 
-    // return {
-    //   ApiUrl: api.url,
-    //   KbId: ai.knowledgeBase.id,
-    // };
     return {
       rdsEndpoint: rds.host,
-      rdsPort: rds.port,
-      rdsUsername: rds.username,
-      rdsDatabase: rds.database,
+      KbId: ai.knowledgeBase.id,
     };
   },
 });
