@@ -10,6 +10,9 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.995.0",
+    "@pulumi/command": "^1.2.0",
+    "add": "^2.0.6",
     "sst": "^3"
   }
 }
