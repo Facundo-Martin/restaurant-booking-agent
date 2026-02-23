@@ -1,3 +1,4 @@
+import * as command from "@pulumi/command";
 import { rds, kbBucket } from "./storage";
 
 // IAM role that Bedrock assumes to read documents from S3 and write embeddings to the vector store
@@ -128,7 +129,7 @@ const knowledgeBase = new aws.bedrock.AgentKnowledgeBase(
 );
 
 // S3 data source — tells Bedrock where to find documents and how to chunk them before embedding
-new aws.bedrock.AgentDataSource("KbDataSource", {
+const kbDataSource = new aws.bedrock.AgentDataSource("KbDataSource", {
   knowledgeBaseId: knowledgeBase.id,
   name: `${$app.name}-${$app.stage}-s3`,
   dataSourceConfiguration: {
@@ -156,5 +157,24 @@ sst.Linkable.wrap(aws.bedrock.AgentKnowledgeBase, (kb) => ({
     }),
   ],
 }));
+
+// Upload kb-documents/ to S3 on every deploy, then kick off a Bedrock ingestion job.
+// Runs locally via the Pulumi command provider — no extra Lambda needed.
+
+const syncDocs = new command.local.Command(
+  "SyncKbDocs",
+  {
+    create: $interpolate`aws s3 sync kb-documents/ s3://${kbBucket.name}/ --profile iamadmin-general --region us-east-1`,
+  },
+  { dependsOn: [kbDataSource] },
+);
+
+new command.local.Command(
+  "StartIngestion",
+  {
+    create: $interpolate`aws bedrock-agent start-ingestion-job --knowledge-base-id ${knowledgeBase.id} --data-source-id ${kbDataSource.id} --profile iamadmin-general --region us-east-1`,
+  },
+  { dependsOn: [syncDocs] },
+);
 
 export { knowledgeBase };
