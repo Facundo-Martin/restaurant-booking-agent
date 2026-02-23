@@ -9,9 +9,10 @@ export default $config({
       home: "aws",
       providers: {
         aws: {
-          region: "us-east-1", // You can change this to your preferred region
-          profile: "your-aws-profile", // Replace with your AWS profile name
+          region: "us-east-1",
+          profile: "iamadmin-general",
         },
+        command: "1.0.1",
       },
     };
   },
@@ -28,7 +29,7 @@ export default $config({
     //   KbId: ai.knowledgeBase.id,
     // };
     return {
-      rdsHost: rds.host,
+      rdsEndpoint: rds.host,
       rdsPort: rds.port,
       rdsUsername: rds.username,
       rdsDatabase: rds.database,
