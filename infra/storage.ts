@@ -11,28 +11,27 @@ const rds = new sst.aws.Aurora("VectorStore", {
   scaling: { min: "0.5 ACU", max: "1 ACU" },
 });
 
-// // Stores restaurant reservations
-// const table = new sst.aws.Dynamo("Bookings", {
-//   fields: {
-//     booking_id: "string",
-//     user_id: "string",
-//     restaurant_name: "string",
-//     date: "string",
-//   },
-//   primaryIndex: { hashKey: "booking_id", rangeKey: "restaurant_name" },
-//   globalIndexes: {
-//     // Enables queries like "all bookings at Restaurant X on date Y" without a full table scan
-//     ByRestaurantDate: {
-//       hashKey: "restaurant_name",
-//       rangeKey: "date",
-//     },
-//     // Enables queries like "all bookings for user X"
-//     ByUser: {
-//       hashKey: "user_id",
-//       rangeKey: "date",
-//     },
-//   },
-// });
+// Stores restaurant reservations
+const table = new sst.aws.Dynamo("Bookings", {
+  fields: {
+    booking_id: "string",
+    user_id: "string",
+    restaurant_name: "string",
+    date: "string",
+  },
+  primaryIndex: { hashKey: "booking_id", rangeKey: "restaurant_name" },
+  globalIndexes: {
+    // Enables queries like "all bookings at Restaurant X on date Y" without a full table scan
+    ByRestaurantDate: {
+      hashKey: "restaurant_name",
+      rangeKey: "date",
+    },
+    // Enables queries like "all bookings for user X"
+    ByUser: {
+      hashKey: "user_id",
+      rangeKey: "date",
+    },
+  },
+});
 
-// export { table, kbBucket, rds };
-export { kbBucket, rds };
+export { table, kbBucket, rds };
