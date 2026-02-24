@@ -1,6 +1,13 @@
 # dependencies
 node_modules
 
+# python
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+
 # sst
 .sst
 sst-env.d.ts
