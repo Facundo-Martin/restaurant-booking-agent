@@ -1,58 +1,7 @@
-import { ossVpcEndpoint } from "./networking";
-import { kbBucket } from "./storage";
+import * as command from "@pulumi/command";
+import { rds, kbBucket } from "./storage";
 
-// Stage-aware name used across all OpenSearch Serverless (OSS) resources to avoid conflicts between stages
-const collectionName = `${$app.name}-${$app.stage}`;
-
-// Encryption policy (must exist before the collection is created) -> https://www.pulumi.com/registry/packages/aws/api-docs/opensearch/serverlesscollection/
-const ossEncryptionPolicy = new aws.opensearch.ServerlessSecurityPolicy(
-  "OssEncryption",
-  {
-    name: `${collectionName}-enc`,
-    type: "encryption",
-    policy: JSON.stringify({
-      Rules: [
-        {
-          Resource: [`collection/${collectionName}`],
-          ResourceType: "collection",
-        },
-      ],
-      AWSOwnedKey: true,
-    }),
-  },
-);
-
-// Vector store that holds the restaurant document embeddings used for RAG retrieval
-const ossCollection = new aws.opensearch.ServerlessCollection(
-  "OssCollection",
-  {
-    name: collectionName,
-    type: "VECTORSEARCH",
-  },
-  { dependsOn: [ossEncryptionPolicy] },
-);
-
-// Blocks all public internet access — only traffic through the OSS VPC endpoint is accepted
-new aws.opensearch.ServerlessSecurityPolicy("OssNetwork", {
-  name: `${collectionName}-net`,
-  type: "network",
-  policy: ossVpcEndpoint.id.apply((vpceId) =>
-    JSON.stringify([
-      {
-        Rules: [
-          {
-            Resource: [`collection/${collectionName}`],
-            ResourceType: "collection",
-          },
-        ],
-        AllowFromPublic: false,
-        SourceVPCEs: [vpceId],
-      },
-    ]),
-  ),
-});
-
-// IAM role that Bedrock assumes to read documents from S3 and write embeddings to OSS
+// IAM role that Bedrock assumes to read documents from S3 and write embeddings to the vector store
 const kbExecutionRole = new aws.iam.Role("KbExecutionRole", {
   assumeRolePolicy: {
     Version: "2012-10-17",
@@ -72,15 +21,18 @@ const kbExecutionRole = new aws.iam.Role("KbExecutionRole", {
   inlinePolicies: [
     {
       // Allows Bedrock to call the Titan embedding model when ingesting documents
-      name: "KbFmPolicy",
+      name: "KnowledgeBaseFoundationModelPolicy",
       policy: aws.getRegionOutput().name.apply((region) =>
         JSON.stringify({
           Version: "2012-10-17",
           Statement: [
             {
+              Sid: "BedrockInvokeEmbeddingModel",
               Effect: "Allow",
               Action: ["bedrock:InvokeModel"],
-              Resource: `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`,
+              Resource: [
+                `arn:aws:bedrock:${region}::foundation-model/amazon.titan-embed-text-v2:0`,
+              ],
             },
           ],
         }),
@@ -88,12 +40,13 @@ const kbExecutionRole = new aws.iam.Role("KbExecutionRole", {
     },
     {
       // Allows Bedrock to read .docx source files from the KB bucket during ingestion
-      name: "KbS3Policy",
+      name: "KnowledgeBaseS3AccessPolicy",
       policy: $resolve(kbBucket.arn).apply((arn) =>
         JSON.stringify({
           Version: "2012-10-17",
           Statement: [
             {
+              Sid: "S3ReadSourceDocuments",
               Effect: "Allow",
               Action: ["s3:GetObject", "s3:ListBucket"],
               Resource: [arn, `${arn}/*`],
@@ -103,69 +56,81 @@ const kbExecutionRole = new aws.iam.Role("KbExecutionRole", {
       ),
     },
     {
-      // Allows Bedrock to write embeddings into the OSS collection
-      // aoss:APIAccessAll is the only IAM-level OSS action — fine-grained control lives in OssDataAccess below
-      name: "KbOssPolicy",
-      policy: ossCollection.arn.apply((arn) =>
-        JSON.stringify({
-          Version: "2012-10-17",
-          Statement: [
-            {
-              Effect: "Allow",
-              Action: ["aoss:APIAccessAll"],
-              Resource: arn,
-            },
-          ],
-        }),
+      // Allows Bedrock to query Aurora via the RDS Data API and read the credentials secret
+      name: "KnowledgeBaseRDSAccessPolicy",
+      policy: $resolve([rds.clusterArn, rds.secretArn]).apply(
+        ([clusterArn, secretArn]) =>
+          JSON.stringify({
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Sid: "RDSDescribe",
+                Effect: "Allow",
+                Action: ["rds:DescribeDBClusters"],
+                Resource: [clusterArn],
+              },
+              {
+                Sid: "RDSDataApiAccess",
+                Effect: "Allow",
+                Action: [
+                  "rds-data:BatchExecuteStatement",
+                  "rds-data:ExecuteStatement",
+                ],
+                Resource: [clusterArn],
+              },
+              {
+                Sid: "SecretsManagerAccess",
+                Effect: "Allow",
+                Action: ["secretsmanager:GetSecretValue"],
+                Resource: [secretArn],
+              },
+            ],
+          }),
       ),
     },
   ],
 });
 
-// Grants the KB execution role (ingestion pipeline) and the deployer (debugging) access to the collection
-new aws.opensearch.ServerlessAccessPolicy("OssDataAccess", {
-  name: `${collectionName}-data`,
-  type: "data",
-  policy: kbExecutionRole.arn.apply((roleArn) =>
-    aws.getCallerIdentityOutput().arn.apply((deployerArn) =>
-      JSON.stringify([
-        {
-          Rules: [
-            {
-              ResourceType: "collection",
-              Resource: [`collection/${collectionName}`],
-              Permission: [
-                "aoss:CreateCollectionItems",
-                "aoss:DeleteCollectionItems",
-                "aoss:UpdateCollectionItems",
-                "aoss:DescribeCollectionItems",
-              ],
-            },
-            {
-              ResourceType: "index",
-              Resource: [`index/${collectionName}/*`],
-              Permission: [
-                "aoss:CreateIndex",
-                "aoss:DeleteIndex",
-                "aoss:UpdateIndex",
-                "aoss:DescribeIndex",
-                "aoss:ReadDocument",
-                "aoss:WriteDocument",
-              ],
-            },
-          ],
-          Principal: [roleArn, deployerArn],
-        },
-      ]),
+// Initialize pgvector schema in Aurora via the RDS Data API — no tunnel or bastion needed.
+// Data API is accessible directly from the deployer's machine with IAM credentials.
+// All statements use IF NOT EXISTS so this is idempotent across re-deploys.
+const initSchema = new command.local.Command(
+  "InitDbSchema",
+  {
+    create: $resolve([rds.clusterArn, rds.secretArn, rds.database]).apply(
+      ([clusterArn, secretArn, database]) => {
+        const exec = (sql: string) =>
+          `aws rds-data execute-statement --resource-arn ${clusterArn} --secret-arn ${secretArn} --database ${database} --sql "${sql}" --profile iamadmin-general --region us-east-1`;
+        return [
+          exec("CREATE EXTENSION IF NOT EXISTS vector"),
+          exec("CREATE SCHEMA IF NOT EXISTS bedrock_integration"),
+          exec(
+            "CREATE TABLE IF NOT EXISTS bedrock_integration.bedrock_kb (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), embedding vector(1024), chunks text NOT NULL, metadata json NOT NULL, custom_metadata jsonb)",
+          ),
+          exec(
+            "CREATE INDEX IF NOT EXISTS bedrock_kb_embedding_idx ON bedrock_integration.bedrock_kb USING hnsw (embedding vector_cosine_ops) WITH (ef_construction=256)",
+          ),
+          exec(
+            "CREATE INDEX IF NOT EXISTS bedrock_kb_chunks_idx ON bedrock_integration.bedrock_kb USING gin (to_tsvector('simple', chunks))",
+          ),
+          exec(
+            "CREATE INDEX IF NOT EXISTS bedrock_kb_custom_metadata_idx ON bedrock_integration.bedrock_kb USING gin (custom_metadata)",
+          ),
+        ].join(" &&\n");
+      },
     ),
-  ),
-});
+  },
+  // The RDS Data API requires a running cluster *instance*, not just the cluster itself.
+  // dependsOn ensures Pulumi waits for the instance to finish provisioning before
+  // attempting any SQL via the Data API.
+  { dependsOn: [rds.nodes.instance] },
+);
 
-// Bedrock Knowledge Base — wires together the OSS vector store, the embedding model, and the S3 data source
+// Bedrock Knowledge Base — backed by Aurora + pgvector instead of OSS
 const knowledgeBase = new aws.bedrock.AgentKnowledgeBase(
   "RestaurantKB",
   {
-    name: collectionName,
+    name: `${$app.name}-${$app.stage}`,
     roleArn: kbExecutionRole.arn,
     knowledgeBaseConfiguration: {
       type: "VECTOR",
@@ -179,25 +144,28 @@ const knowledgeBase = new aws.bedrock.AgentKnowledgeBase(
       },
     },
     storageConfiguration: {
-      type: "OPENSEARCH_SERVERLESS",
-      opensearchServerlessConfiguration: {
-        collectionArn: ossCollection.arn,
-        vectorIndexName: `${collectionName}-index`,
+      type: "RDS",
+      rdsConfiguration: {
+        resourceArn: rds.clusterArn,
+        databaseName: rds.database,
+        tableName: "bedrock_integration.bedrock_kb",
+        credentialsSecretArn: rds.secretArn,
         fieldMapping: {
-          vectorField: "vector",
-          textField: "text",
-          metadataField: "text-metadata",
+          primaryKeyField: "id",
+          vectorField: "embedding",
+          textField: "chunks",
+          metadataField: "metadata",
         },
       },
     },
   },
-  { dependsOn: [kbExecutionRole, ossCollection] },
+  { dependsOn: [kbExecutionRole, initSchema] },
 );
 
 // S3 data source — tells Bedrock where to find documents and how to chunk them before embedding
-new aws.bedrock.AgentDataSource("KbDataSource", {
+const kbDataSource = new aws.bedrock.AgentDataSource("KbDataSource", {
   knowledgeBaseId: knowledgeBase.id,
-  name: `${collectionName}-s3`,
+  name: `${$app.name}-${$app.stage}-s3`,
   dataSourceConfiguration: {
     type: "S3",
     s3Configuration: {
@@ -212,19 +180,34 @@ new aws.bedrock.AgentDataSource("KbDataSource", {
   },
 });
 
-// TODO: Trigger a KB ingestion job after the data source is created
-// The Pulumi AWS provider has no native ingestion job resource — needs a custom script or SDK call post-deploy
-
 // Registers the KB with SST's link system so Lambda functions receive its ID at deploy time
 // and are automatically granted bedrock:Retrieve + bedrock:RetrieveAndGenerate permissions
 sst.Linkable.wrap(aws.bedrock.AgentKnowledgeBase, (kb) => ({
   properties: { id: kb.id, arn: kb.arn, name: kb.name },
   include: [
     sst.aws.permission({
-      actions: ["bedrock:Retrieve", "bedrock:RetrieveAndGenerate"],
+      actions: ["bedrock:RetrieveAndGenerate", "bedrock:Retrieve"],
       resources: [kb.arn],
     }),
   ],
 }));
+
+// Upload kb-documents/ to S3 on every deploy, then kick off a Bedrock ingestion job.
+// Note: Path is relative to .sst/platform/ (SST's Pulumi CWD), so ../../ reaches the project root.
+const syncDocs = new command.local.Command(
+  "SyncKbDocs",
+  {
+    create: $interpolate`aws s3 sync ../../kb-documents/ s3://${kbBucket.name}/ --profile iamadmin-general --region us-east-1`,
+  },
+  { dependsOn: [kbDataSource] },
+);
+
+new command.local.Command(
+  "StartIngestion",
+  {
+    create: $interpolate`aws bedrock-agent start-ingestion-job --knowledge-base-id ${knowledgeBase.id} --data-source-id ${kbDataSource.dataSourceId} --profile iamadmin-general --region us-east-1`,
+  },
+  { dependsOn: [syncDocs] },
+);
 
 export { knowledgeBase };

@@ -7,17 +7,25 @@ export default $config({
       removal: input?.stage === "production" ? "retain" : "remove",
       protect: ["production"].includes(input?.stage),
       home: "aws",
+      providers: {
+        aws: {
+          region: "us-east-1",
+          profile: "iamadmin-general",
+        },
+        command: "1.0.1",
+      },
     };
   },
   async run() {
     await import("./infra/networking");
-    await import("./infra/storage");
-    await import("./infra/ai");
-    const api = await import("./infra/api");
+    const { rds } = await import("./infra/storage");
+    const ai = await import("./infra/ai");
+    // api.ts remains commented until backend/ Python handlers are implemented
+    // const api = await import("./infra/api");
 
-    // Set NEXT_PUBLIC_API_URL in Vercel using this output
     return {
-      ApiUrl: api.url,
+      rdsEndpoint: rds.host,
+      KbId: ai.knowledgeBase.id,
     };
   },
 });
