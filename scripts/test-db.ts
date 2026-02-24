@@ -15,11 +15,6 @@
  */
 
 import {
-  RDSClient,
-  DescribeDBClustersCommand,
-  type DBCluster,
-} from "@aws-sdk/client-rds";
-import {
   RDSDataClient,
   ExecuteStatementCommand,
 } from "@aws-sdk/client-rds-data";
@@ -27,30 +22,14 @@ import { Resource } from "sst";
 
 const REGION = "us-east-1";
 
-// Resource.VectorStore is the sst.aws.Aurora component named "VectorStore" in infra/storage.ts
+// SST Aurora injects clusterArn, secretArn, and database directly — no cluster discovery needed.
+// MasterUserSecret is not set on SST Aurora clusters; it uses its own Secrets Manager secret.
 // @ts-ignore — injected by sst shell at runtime
-const host: string = Resource.VectorStore.host;
+const clusterArn: string = Resource.VectorStore.clusterArn;
+// @ts-ignore
+const secretArn: string = Resource.VectorStore.secretArn;
 // @ts-ignore
 const database: string = Resource.VectorStore.database;
-
-// Discover cluster ARN and managed secret ARN by matching the endpoint
-const rdsClient = new RDSClient({ region: REGION });
-// @ts-ignore — top-level await, valid at runtime with bun
-const { DBClusters } = await rdsClient.send(new DescribeDBClustersCommand({}));
-
-const cluster = DBClusters?.find((c: DBCluster) => c.Endpoint === host);
-if (!cluster?.DBClusterArn) {
-  console.error(`No Aurora cluster found with endpoint: ${host}`);
-  console.error("Is the stack deployed? Run: npx sst deploy --stage <stage>");
-  process.exit(1);
-}
-
-const clusterArn = cluster.DBClusterArn;
-const secretArn = cluster.MasterUserSecret?.SecretArn;
-if (!secretArn) {
-  console.error("Cluster has no managed secret — check SST Aurora config.");
-  process.exit(1);
-}
 
 console.log(`Cluster: ${clusterArn}`);
 console.log(`Database: ${database}`);
@@ -83,39 +62,50 @@ async function check(
   return ok;
 }
 
-// @ts-ignore — top-level await
-const results = await Promise.all([
-  check(
-    "vector extension",
-    "SELECT extname FROM pg_extension WHERE extname = 'vector'",
-    "vector",
-  ),
-  check(
-    "bedrock_integration schema",
-    "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'bedrock_integration'",
-    "bedrock_integration",
-  ),
-  check(
-    "bedrock_kb table",
-    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'bedrock_integration' AND table_name = 'bedrock_kb'",
-    "bedrock_kb",
-  ),
-  check(
-    "hnsw embedding index (bedrock_kb_embedding_idx)",
-    "SELECT indexname FROM pg_indexes WHERE tablename = 'bedrock_kb' AND indexname = 'bedrock_kb_embedding_idx'",
-    "bedrock_kb_embedding_idx",
-  ),
-  check(
-    "gin chunks index (bedrock_kb_chunks_idx)",
-    "SELECT indexname FROM pg_indexes WHERE tablename = 'bedrock_kb' AND indexname = 'bedrock_kb_chunks_idx'",
-    "bedrock_kb_chunks_idx",
-  ),
-  check(
-    "gin metadata index (bedrock_kb_custom_metadata_idx)",
-    "SELECT indexname FROM pg_indexes WHERE tablename = 'bedrock_kb' AND indexname = 'bedrock_kb_custom_metadata_idx'",
-    "bedrock_kb_custom_metadata_idx",
-  ),
-]);
+const checks = [
+  // 1. Verify the pgvector extension is installed — required for storing and querying embeddings
+  {
+    label: "vector extension",
+    sql: "SELECT extname FROM pg_extension WHERE extname = 'vector'",
+    expected: "vector",
+  },
+  // 2. Verify the bedrock_integration schema exists — Bedrock expects this exact namespace
+  {
+    label: "bedrock_integration schema",
+    sql: "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'bedrock_integration'",
+    expected: "bedrock_integration",
+  },
+  // 3. Verify the bedrock_kb table exists with the correct schema and column layout
+  {
+    label: "bedrock_kb table",
+    sql: "SELECT table_name FROM information_schema.tables WHERE table_schema = 'bedrock_integration' AND table_name = 'bedrock_kb'",
+    expected: "bedrock_kb",
+  },
+  // 4. Verify the HNSW index on the embedding column exists — needed for vector similarity search
+  {
+    label: "hnsw embedding index (bedrock_kb_embedding_idx)",
+    sql: "SELECT indexname FROM pg_indexes WHERE tablename = 'bedrock_kb' AND indexname = 'bedrock_kb_embedding_idx'",
+    expected: "bedrock_kb_embedding_idx",
+  },
+  // 5. Verify the GIN index on the chunks column exists — needed for full-text keyword search
+  {
+    label: "gin chunks index (bedrock_kb_chunks_idx)",
+    sql: "SELECT indexname FROM pg_indexes WHERE tablename = 'bedrock_kb' AND indexname = 'bedrock_kb_chunks_idx'",
+    expected: "bedrock_kb_chunks_idx",
+  },
+  // 6. Verify the GIN index on custom_metadata exists — needed for filtering by metadata fields
+  {
+    label: "gin metadata index (bedrock_kb_custom_metadata_idx)",
+    sql: "SELECT indexname FROM pg_indexes WHERE tablename = 'bedrock_kb' AND indexname = 'bedrock_kb_custom_metadata_idx'",
+    expected: "bedrock_kb_custom_metadata_idx",
+  },
+];
+
+const results: boolean[] = [];
+for (const { label, sql, expected } of checks) {
+  // @ts-ignore — top-level await
+  results.push(await check(label, sql, expected));
+}
 
 const passed = results.filter(Boolean).length;
 console.log(`\n${passed}/${results.length} checks passed`);
