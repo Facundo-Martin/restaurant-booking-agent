@@ -1,12 +1,17 @@
 {
   "name": "restaurant-booking-agent",
-  "version": "0.0.0",
-  "workspaces": [
-    "packages/*"
-  ],
-  "scripts": {},
+  "private": true,
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "dev": "sst dev",
+    "deploy": "sst deploy",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint"
+  },
   "devDependencies": {
     "@tsconfig/node22": "^22",
+    "turbo": "^2.8.10",
     "typescript": "^5"
   },
   "dependencies": {
@@ -14,7 +19,6 @@
     "@aws-sdk/client-rds": "^3.996.0",
     "@aws-sdk/client-rds-data": "^3.996.0",
     "@pulumi/command": "^1.2.0",
-    "add": "^2.0.6",
     "sst": "^3"
   }
 }
