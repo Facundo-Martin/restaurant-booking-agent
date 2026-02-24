@@ -1,15 +1,8 @@
 """DynamoDB tools for managing restaurant bookings."""
 
-import uuid
-
-import boto3
 from strands import tool
 
-from app.config import TABLE_NAME
-
-# Initialized once per cold start — reused across all warm invocations.
-# Never initialize boto3 clients inside tool functions.
-_table = boto3.resource("dynamodb").Table(TABLE_NAME)
+from app.repositories import bookings as booking_repo
 
 
 @tool
@@ -23,10 +16,8 @@ def get_booking_details(booking_id: str, restaurant_name: str) -> dict:
     Returns:
         The booking details, or a message if not found.
     """
-    response = _table.get_item(
-        Key={"booking_id": booking_id, "restaurant_name": restaurant_name}
-    )
-    return response.get("Item", {"error": f"No booking found with ID {booking_id}"})
+    booking = booking_repo.get(booking_id, restaurant_name)
+    return booking.model_dump() if booking else {"error": f"No booking found with ID {booking_id}"}
 
 
 @tool
@@ -49,18 +40,14 @@ def create_booking(
     Returns:
         The created booking details including the generated booking_id.
     """
-    item: dict = {
-        "booking_id": str(uuid.uuid4()),
-        "restaurant_name": restaurant_name,
-        "user_id": user_id,
-        "date": date,
-        "party_size": party_size,
-    }
-    if special_requests:
-        item["special_requests"] = special_requests
-
-    _table.put_item(Item=item)
-    return item
+    booking = booking_repo.create(
+        restaurant_name=restaurant_name,
+        user_id=user_id,
+        date=date,
+        party_size=party_size,
+        special_requests=special_requests,
+    )
+    return booking.model_dump()
 
 
 @tool
@@ -74,11 +61,7 @@ def delete_booking(booking_id: str, restaurant_name: str) -> str:
     Returns:
         A confirmation message, or an error if the booking was not found.
     """
-    try:
-        _table.delete_item(
-            Key={"booking_id": booking_id, "restaurant_name": restaurant_name},
-            ConditionExpression="attribute_exists(booking_id)",
-        )
+    deleted = booking_repo.delete(booking_id, restaurant_name)
+    if deleted:
         return f"Booking {booking_id} at {restaurant_name} successfully deleted."
-    except _table.meta.client.exceptions.ConditionalCheckFailedException:
-        return f"No booking found with ID {booking_id} at {restaurant_name}."
+    return f"No booking found with ID {booking_id} at {restaurant_name}."
