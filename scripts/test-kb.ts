@@ -1,13 +1,25 @@
 /**
  * Tests the Bedrock Knowledge Base via the AWS SDK.
- * Requires the KB to be deployed (infra/ai.ts uncommented and deployed).
+ * Requires the KB to be deployed.
  *
  * Run with:
- *   bun sst shell --stage <stage> -- bun run scripts/test-kb.ts [mode] ["query"]
+ *   npx sst shell --stage <stage> -- npx tsx scripts/test-kb.ts [mode] ["query"]
  *
  * Examples:
- *   bun sst shell --stage dev -- bun run scripts/test-kb.ts retrieve "What Italian restaurants are available?"
- *   bun sst shell --stage dev -- bun run scripts/test-kb.ts generate "What Italian restaurants are available?"
+ *   npx sst shell --stage dev -- npx tsx scripts/test-kb.ts retrieve "What Italian restaurants are available?"
+ *   npx sst shell --stage dev -- npx tsx scripts/test-kb.ts generate "What Italian restaurants are available?"
+ *
+ * Modes:
+ *   retrieve — raw vector similarity search. Returns the top N chunks whose embeddings are
+ *              closest to the query. Useful for debugging what the KB found and whether
+ *              indexing is working. Results may look "wrong" (e.g. non-Italian restaurants
+ *              returned for an Italian query) because vector search is semantic, not literal —
+ *              all restaurant menus share vocabulary and score similarly.
+ *
+ *   generate — full RAG pipeline: retrieve + LLM synthesis. Passes the retrieved chunks to
+ *              Claude as context and asks it to answer the question. The LLM filters and
+ *              reasons over the chunks to produce a coherent, correct answer. This is what
+ *              the agent uses at runtime.
  */
 
 import {
