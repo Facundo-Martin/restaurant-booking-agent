@@ -1,0 +1,3 @@
+packages:
+  - "apps/*"
+  # backend/ is intentionally excluded — Python is managed by uv, not pnpm
