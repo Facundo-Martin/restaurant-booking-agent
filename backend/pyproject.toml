@@ -1,7 +1,6 @@
 [project]
-name = "backend"
+name = "restaurant-booking-agent-backend"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.14"
+description = "FastAPI + Strands Agents backend for the restaurant booking assistant"
+requires-python = ">=3.11"
 dependencies = []
