@@ -104,14 +104,26 @@ const initSchema = new command.local.Command(
         return [
           exec("CREATE EXTENSION IF NOT EXISTS vector"),
           exec("CREATE SCHEMA IF NOT EXISTS bedrock_integration"),
-          exec("CREATE TABLE IF NOT EXISTS bedrock_integration.bedrock_kb (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), embedding vector(1024), chunks text NOT NULL, metadata json NOT NULL, custom_metadata jsonb)"),
-          exec("CREATE INDEX IF NOT EXISTS bedrock_kb_embedding_idx ON bedrock_integration.bedrock_kb USING hnsw (embedding vector_cosine_ops) WITH (ef_construction=256)"),
-          exec("CREATE INDEX IF NOT EXISTS bedrock_kb_chunks_idx ON bedrock_integration.bedrock_kb USING gin (to_tsvector('simple', chunks))"),
-          exec("CREATE INDEX IF NOT EXISTS bedrock_kb_custom_metadata_idx ON bedrock_integration.bedrock_kb USING gin (custom_metadata)"),
+          exec(
+            "CREATE TABLE IF NOT EXISTS bedrock_integration.bedrock_kb (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), embedding vector(1024), chunks text NOT NULL, metadata json NOT NULL, custom_metadata jsonb)",
+          ),
+          exec(
+            "CREATE INDEX IF NOT EXISTS bedrock_kb_embedding_idx ON bedrock_integration.bedrock_kb USING hnsw (embedding vector_cosine_ops) WITH (ef_construction=256)",
+          ),
+          exec(
+            "CREATE INDEX IF NOT EXISTS bedrock_kb_chunks_idx ON bedrock_integration.bedrock_kb USING gin (to_tsvector('simple', chunks))",
+          ),
+          exec(
+            "CREATE INDEX IF NOT EXISTS bedrock_kb_custom_metadata_idx ON bedrock_integration.bedrock_kb USING gin (custom_metadata)",
+          ),
         ].join(" &&\n");
       },
     ),
   },
+  // The RDS Data API requires a running cluster *instance*, not just the cluster itself.
+  // dependsOn ensures Pulumi waits for the instance to finish provisioning before
+  // attempting any SQL via the Data API.
+  { dependsOn: [rds.nodes.instance] },
 );
 
 // Bedrock Knowledge Base — backed by Aurora + pgvector instead of OSS
@@ -181,12 +193,11 @@ sst.Linkable.wrap(aws.bedrock.AgentKnowledgeBase, (kb) => ({
 }));
 
 // Upload kb-documents/ to S3 on every deploy, then kick off a Bedrock ingestion job.
-// Runs locally via the Pulumi command provider — no extra Lambda needed.
-
+// Note: Path is relative to .sst/platform/ (SST's Pulumi CWD), so ../../ reaches the project root.
 const syncDocs = new command.local.Command(
   "SyncKbDocs",
   {
-    create: $interpolate`aws s3 sync kb-documents/ s3://${kbBucket.name}/ --profile iamadmin-general --region us-east-1`,
+    create: $interpolate`aws s3 sync ../../kb-documents/ s3://${kbBucket.name}/ --profile iamadmin-general --region us-east-1`,
   },
   { dependsOn: [kbDataSource] },
 );
@@ -194,7 +205,7 @@ const syncDocs = new command.local.Command(
 new command.local.Command(
   "StartIngestion",
   {
-    create: $interpolate`aws bedrock-agent start-ingestion-job --knowledge-base-id ${knowledgeBase.id} --data-source-id ${kbDataSource.id} --profile iamadmin-general --region us-east-1`,
+    create: $interpolate`aws bedrock-agent start-ingestion-job --knowledge-base-id ${knowledgeBase.id} --data-source-id ${kbDataSource.dataSourceId} --profile iamadmin-general --region us-east-1`,
   },
   { dependsOn: [syncDocs] },
 );
