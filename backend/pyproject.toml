@@ -1,0 +1,43 @@
+[project]
+name = "restaurant-booking-agent-backend"
+version = "0.1.0"
+description = "FastAPI + Strands Agents backend for the restaurant booking assistant"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "mangum>=0.19.0",
+    "strands-agents>=0.1.0",
+    "strands-agents-tools>=0.1.0",
+    "boto3>=1.34.0",
+    "sst",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.27.0",
+    "moto[dynamodb]>=5.0.0",
+    "ty>=0.0.1",
+    "ruff>=0.9.0",
+    "uvicorn>=0.30.0",
+]
+
+# SST Python SDK is not published to PyPI — install from source
+[tool.uv.sources]
+sst = { git = "https://github.com/sst/sst.git", subdirectory = "sdk/python", branch = "dev" }
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
