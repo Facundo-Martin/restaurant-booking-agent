@@ -20,12 +20,12 @@ export default $config({
     await import("./infra/networking");
     const { rds } = await import("./infra/storage");
     const ai = await import("./infra/ai");
-    // api.ts remains commented until backend/ Python handlers are implemented
-    // const api = await import("./infra/api");
+    const api = await import("./infra/api");
 
     return {
       rdsEndpoint: rds.host,
       KbId: ai.knowledgeBase.id,
+      ApiUrl: api.url,
     };
   },
 });

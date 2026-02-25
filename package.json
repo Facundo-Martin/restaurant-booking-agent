@@ -4,13 +4,16 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev": "sst dev",
-    "deploy": "sst deploy",
+    "api": "sst shell -- sh -c 'cd backend && uv run uvicorn app.main:app --reload'",
+    "deploy": "sst deploy --stage dev",
+    "deploy:prod": "sst deploy --stage production",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint"
   },
   "devDependencies": {
     "@tsconfig/node22": "^22",
+    "concurrently": "^9.2.1",
     "turbo": "^2.8.10",
     "typescript": "^5"
   },
@@ -19,6 +22,6 @@
     "@aws-sdk/client-rds": "^3.996.0",
     "@aws-sdk/client-rds-data": "^3.996.0",
     "@pulumi/command": "^1.2.0",
-    "sst": "^3"
+    "sst": "^3.18.12"
   }
 }
