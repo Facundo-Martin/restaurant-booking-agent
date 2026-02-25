@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "dev": "concurrently --names \"sst,api\" --prefix-colors \"cyan,green\" --kill-others \"sst dev\" \"cd backend && uv run uvicorn app.main:app --reload\"",
+    "dev": "sst dev -- sh -c 'cd backend && uv run uvicorn app.main:app --reload'",
     "deploy": "sst deploy --stage dev",
     "deploy:prod": "sst deploy --stage production",
     "build": "turbo run build",
