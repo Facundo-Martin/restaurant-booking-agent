@@ -11,6 +11,10 @@ __pycache__
 # sst
 .sst
 sst-env.d.ts
+backend/sst.pyi
+
+# ide
+.vscode/
 
 # tmp files
 .#*
