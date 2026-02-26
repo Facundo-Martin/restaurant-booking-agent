@@ -101,19 +101,30 @@ export function useStreamingChat({ api }: UseStreamingChatOptions): UseStreaming
         let buffer = ''
 
         // We accumulate the assistant message state here and push updates via setMessages
-        let currentText = ''
+        let currentReasoning = '' // text streamed before the first tool call
+        let currentText = ''      // text streamed after tool calls finish
+        let hasSeenToolCall = false
         const toolInvocations = new Map<string, ToolInvocation>()
 
         const buildParts = () => {
           const parts: ChatMessage['parts'] = []
-          // Text goes first
-          if (currentText) {
-            parts.push({ type: 'text', text: currentText })
+          const hasTools = toolInvocations.size > 0
+
+          // Show pre-tool text as regular text (preamble like "Let me check that for you!")
+          // only when tools were actually used; otherwise it merges into the final text below.
+          if (hasTools && currentReasoning) {
+            parts.push({ type: 'text', text: currentReasoning })
           }
-          // Then tool invocations in order they appeared
+
           for (const inv of toolInvocations.values()) {
             parts.push({ type: 'tool-invocation', toolInvocation: { ...inv } })
           }
+
+          const textContent = hasTools ? currentText : currentReasoning + currentText
+          if (textContent) {
+            parts.push({ type: 'text', text: textContent })
+          }
+
           return parts
         }
 
@@ -139,11 +150,16 @@ export function useStreamingChat({ api }: UseStreamingChatOptions): UseStreaming
 
               switch (event.type) {
                 case 'text-delta':
-                  currentText += event.delta
+                  if (hasSeenToolCall) {
+                    currentText += event.delta
+                  } else {
+                    currentReasoning += event.delta
+                  }
                   updateAssistant()
                   break
 
                 case 'tool-call-start':
+                  hasSeenToolCall = true
                   toolInvocations.set(event.toolCallId, {
                     toolCallId: event.toolCallId,
                     toolName: event.toolName,
@@ -186,6 +202,14 @@ export function useStreamingChat({ api }: UseStreamingChatOptions): UseStreaming
                   return
 
                 case 'done':
+                  // Resolve any tool invocations that never received a tool-result
+                  // event (the backend doesn't emit them yet).
+                  for (const [id, inv] of toolInvocations) {
+                    if (inv.state === 'loading') {
+                      toolInvocations.set(id, { ...inv, state: 'complete' })
+                    }
+                  }
+                  updateAssistant()
                   break
               }
             } catch {
