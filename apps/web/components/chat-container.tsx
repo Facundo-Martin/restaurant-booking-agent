@@ -11,9 +11,7 @@ export function ChatContainer() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [hasInteracted, setHasInteracted] = useState(false)
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL
-    ? `${process.env.NEXT_PUBLIC_API_URL}/chat`
-    : '/api/chat'
+  const apiUrl = process.env.NEXT_PUBLIC_CHAT_URL ?? '/api/chat'
   const { messages, sendMessage, status, stop } = useStreamingChat({ api: apiUrl })
 
   const isLoading = status === 'streaming'
