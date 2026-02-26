@@ -6,20 +6,14 @@ from pydantic import BaseModel
 
 
 class ChatApiMessage(BaseModel):
-    """A single message in the conversation history.
-
-    Mirrors ChatApiMessage in packages/types/src/index.ts.
-    """
+    """A single message in the conversation history."""
 
     role: Literal["user", "assistant"]
     content: str
 
 
 class ChatApiRequest(BaseModel):
-    """Request body for POST /chat.
-
-    Mirrors ChatApiRequest in packages/types/src/index.ts.
-    """
+    """Request body for POST /chat."""
 
     messages: list[ChatApiMessage]
 

@@ -102,7 +102,7 @@ async def _stream(request: ChatApiRequest) -> AsyncGenerator[str, None]:
     yield _sse({"type": "done"})
 
 
-@router.post("/chat")
+@router.post("/chat", operation_id="streamChat")
 async def chat(request: ChatApiRequest) -> StreamingResponse:
     logger.info("POST /chat — %d message(s), last: %.80r", len(request.messages), request.messages[-1].content if request.messages else "")
     return StreamingResponse(

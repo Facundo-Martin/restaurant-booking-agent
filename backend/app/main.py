@@ -26,13 +26,13 @@ app.include_router(chat.router)
 app.include_router(bookings.router)
 
 
-@app.get("/health")
+@app.get("/health", operation_id="healthCheck")
 def health() -> dict:
     """Return a simple liveness check response."""
     return {"status": "ok"}
 
 
-@app.api_route("/", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@app.api_route("/", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
 def root() -> JSONResponse:
     """Catch-all for the API root — returns 404 with the valid endpoints listed.
 
