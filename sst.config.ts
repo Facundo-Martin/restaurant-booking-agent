@@ -21,11 +21,13 @@ export default $config({
     const { rds } = await import("./infra/storage");
     const ai = await import("./infra/ai");
     const api = await import("./infra/api");
+    const web = await import("./infra/web");
 
     return {
       rdsEndpoint: rds.host,
       KbId: ai.knowledgeBase.id,
       ApiUrl: api.url,
+      SiteUrl: web.siteUrl,
     };
   },
 });
