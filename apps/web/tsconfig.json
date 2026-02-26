@@ -19,8 +19,7 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"],
-      "@repo/types": ["../../packages/types/src/index.ts"]
+      "@/*": ["./*"]
     }
   },
   "include": [
