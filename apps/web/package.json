@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "openapi-ts && next dev",
     "generate:client": "openapi-ts",
-    "build": "next build",
+    "build": "openapi-ts && next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "openapi-ts && tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

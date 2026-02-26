@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import type { ChatMessage, SSEEvent, ToolInvocation } from '@/lib/types'
+import type { ChatApiMessage } from '@/lib/api'
 
 interface UseStreamingChatOptions {
   /** The SSE endpoint URL — can be a Next.js route or your FastAPI URL */
@@ -73,7 +74,7 @@ export function useStreamingChat({ api }: UseStreamingChatOptions): UseStreaming
 
       try {
         // Build history for context (exclude the in-progress assistant message)
-        const history = [...messages, userMsg].map((m) => ({
+        const history: ChatApiMessage[] = [...messages, userMsg].map((m) => ({
           role: m.role,
           content: m.parts
             .filter((p): p is { type: 'text'; text: string } => p.type === 'text')

@@ -1,10 +1,12 @@
 /**
- * Frontend chat types.
+ * Frontend chat UI types.
  *
- * UI state types (ChatMessage, MessagePart, etc.) are defined here.
- * API contract types (ChatApiRequest, ChatApiMessage) mirror the Python
- * Pydantic models in backend/app/models/schemas.py — Python is the source
- * of truth and these will eventually be generated via @hey-api/openapi-ts.
+ * These are pure frontend state types — they describe what the chat UI holds
+ * in memory, not what crosses the network.
+ *
+ * API contract types (ChatApiMessage, ChatApiRequest, Booking, etc.) live in
+ * lib/client/types.gen.ts, generated from the backend OpenAPI spec via
+ * `pnpm generate:client`. Never hand-edit that file.
  */
 
 // --- Tool invocation state ---
@@ -41,12 +43,3 @@ export type SSEEvent =
   | { type: 'done' }
   | { type: 'error'; error: string }
 
-// --- API contract — mirrors backend/app/models/schemas.py ---
-export interface ChatApiMessage {
-  role: 'user' | 'assistant'
-  content: string
-}
-
-export interface ChatApiRequest {
-  messages: ChatApiMessage[]
-}
