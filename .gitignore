@@ -26,5 +26,8 @@ backend/sst.pyi
 # opennext
 .open-next
 
+# generated
+apps/web/lib/client/
+
 # misc
 .DS_Store
