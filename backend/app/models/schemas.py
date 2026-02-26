@@ -1,20 +1,27 @@
 """Pydantic models for API request/response validation."""
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 
-class ChatRequest(BaseModel):
-    """Incoming chat message from the user."""
+class ChatApiMessage(BaseModel):
+    """A single message in the conversation history.
 
-    message: str
-    session_id: str | None = None
+    Mirrors ChatApiMessage in packages/types/src/index.ts.
+    """
+
+    role: Literal["user", "assistant"]
+    content: str
 
 
-class ChatResponse(BaseModel):
-    """Agent response returned to the user."""
+class ChatApiRequest(BaseModel):
+    """Request body for POST /chat.
 
-    response: str
-    session_id: str | None = None
+    Mirrors ChatApiRequest in packages/types/src/index.ts.
+    """
+
+    messages: list[ChatApiMessage]
 
 
 class Booking(BaseModel):
