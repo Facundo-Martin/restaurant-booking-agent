@@ -1,41 +1,13 @@
 /**
- * Custom chat types — no AI SDK dependency.
- *
- * These mirror the SSE event shapes your FastAPI backend would produce.
- * The frontend hook parses these from the SSE stream and builds the
- * ChatMessage[] array that drives the UI.
+ * Re-exports from the shared @repo/types package.
+ * All chat and SSE types are defined there so the Python backend can mirror them.
  */
-
-// --- Tool invocation state ---
-export type ToolState = 'loading' | 'complete' | 'error'
-
-export interface ToolInvocation {
-  toolCallId: string
-  toolName: string
-  state: ToolState
-  input: Record<string, unknown>
-  output?: Record<string, unknown>
-  error?: string
-}
-
-// --- A single message part (text or tool) ---
-export type MessagePart =
-  | { type: 'text'; text: string }
-  | { type: 'tool-invocation'; toolInvocation: ToolInvocation }
-
-// --- A complete chat message ---
-export interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  parts: MessagePart[]
-  createdAt: Date
-}
-
-// --- SSE events your FastAPI backend would emit ---
-export type SSEEvent =
-  | { type: 'text-delta'; delta: string }
-  | { type: 'tool-call-start'; toolCallId: string; toolName: string; input: Record<string, unknown> }
-  | { type: 'tool-result'; toolCallId: string; toolName: string; output: Record<string, unknown> }
-  | { type: 'tool-error'; toolCallId: string; toolName: string; error: string }
-  | { type: 'done' }
-  | { type: 'error'; error: string }
+export type {
+  ToolState,
+  ToolInvocation,
+  MessagePart,
+  ChatMessage,
+  SSEEvent,
+  ChatApiMessage,
+  ChatApiRequest,
+} from '@repo/types'
