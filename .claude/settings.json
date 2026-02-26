@@ -5,5 +5,12 @@
     "aws-common@aws-skills": true,
     "aws-cost-ops@aws-skills": true,
     "serverless-eda@aws-skills": true
+  },
+  "permissions": {
+    "allow": [
+      "WebFetch",
+      "Bash(gh *)",
+      "Bash(curl *)"
+    ]
   }
 }

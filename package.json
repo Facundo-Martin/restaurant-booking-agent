@@ -7,6 +7,7 @@
     "api": "sst shell -- sh -c 'cd backend && uv run uvicorn app.main:app --reload'",
     "deploy": "sst deploy --stage dev",
     "deploy:prod": "sst deploy --stage production",
+    "remove:dev": "sst remove",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint"
