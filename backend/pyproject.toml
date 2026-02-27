@@ -10,6 +10,7 @@ dependencies = [
     "strands-agents-tools>=0.1.0",
     "boto3>=1.34.0",
     "sst",
+    "sse-starlette>=3.2.0",
 ]
 
 [dependency-groups]
