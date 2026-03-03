@@ -6,13 +6,13 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { ChatMessage } from '@/components/chat-message'
 import { ChatInput } from '@/components/chat-input'
 import { WelcomeScreen } from '@/components/welcome-screen'
+import { env } from '@/env'
 
 export function ChatContainer() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [hasInteracted, setHasInteracted] = useState(false)
 
-  const apiUrl = process.env.NEXT_PUBLIC_CHAT_URL ?? '/api/chat'
-  const { messages, sendMessage, status, stop } = useStreamingChat({ api: apiUrl })
+  const { messages, sendMessage, status, stop } = useStreamingChat({ api: env.NEXT_PUBLIC_CHAT_URL })
 
   const isLoading = status === 'streaming'
 
