@@ -1,0 +1,311 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Restaurant Booking Agent",
+        "description": "FastAPI + Strands Agents backend for the restaurant booking assistant",
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/chat": {
+            "post": {
+                "tags": [
+                    "chat"
+                ],
+                "summary": "Chat",
+                "operationId": "streamChat",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChatApiRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/bookings/{booking_id}": {
+            "get": {
+                "tags": [
+                    "bookings"
+                ],
+                "summary": "Get Booking",
+                "description": "Retrieve a booking by ID.\n\nrestaurant_name is required as a query parameter because DynamoDB's\ncomposite key requires both booking_id (hash) and restaurant_name (range).",
+                "operationId": "getBooking",
+                "parameters": [
+                    {
+                        "name": "booking_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Booking Id"
+                        }
+                    },
+                    {
+                        "name": "restaurant_name",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Required \u2014 part of the composite key",
+                            "title": "Restaurant Name"
+                        },
+                        "description": "Required \u2014 part of the composite key"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Booking"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "bookings"
+                ],
+                "summary": "Delete Booking",
+                "description": "Delete a booking by ID.\n\nrestaurant_name is required as a query parameter because DynamoDB's\ncomposite key requires both booking_id (hash) and restaurant_name (range).",
+                "operationId": "deleteBooking",
+                "parameters": [
+                    {
+                        "name": "booking_id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "title": "Booking Id"
+                        }
+                    },
+                    {
+                        "name": "restaurant_name",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "description": "Required \u2014 part of the composite key",
+                            "title": "Restaurant Name"
+                        },
+                        "description": "Required \u2014 part of the composite key"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Successful Response"
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "summary": "Health",
+                "description": "Return a simple liveness check response.",
+                "operationId": "healthCheck",
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": true,
+                                    "type": "object",
+                                    "title": "Response Healthcheck"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Booking": {
+                "properties": {
+                    "booking_id": {
+                        "type": "string",
+                        "title": "Booking Id"
+                    },
+                    "restaurant_name": {
+                        "type": "string",
+                        "title": "Restaurant Name"
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "title": "User Id"
+                    },
+                    "date": {
+                        "type": "string",
+                        "title": "Date"
+                    },
+                    "party_size": {
+                        "type": "integer",
+                        "title": "Party Size"
+                    },
+                    "special_requests": {
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "title": "Special Requests"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "booking_id",
+                    "restaurant_name",
+                    "user_id",
+                    "date",
+                    "party_size"
+                ],
+                "title": "Booking",
+                "description": "A restaurant reservation record."
+            },
+            "ChatApiMessage": {
+                "properties": {
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "user",
+                            "assistant"
+                        ],
+                        "title": "Role"
+                    },
+                    "content": {
+                        "type": "string",
+                        "title": "Content"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "role",
+                    "content"
+                ],
+                "title": "ChatApiMessage",
+                "description": "A single message in the conversation history."
+            },
+            "ChatApiRequest": {
+                "properties": {
+                    "messages": {
+                        "items": {
+                            "$ref": "#/components/schemas/ChatApiMessage"
+                        },
+                        "type": "array",
+                        "title": "Messages"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "messages"
+                ],
+                "title": "ChatApiRequest",
+                "description": "Request body for POST /chat."
+            },
+            "HTTPValidationError": {
+                "properties": {
+                    "detail": {
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        },
+                        "type": "array",
+                        "title": "Detail"
+                    }
+                },
+                "type": "object",
+                "title": "HTTPValidationError"
+            },
+            "ValidationError": {
+                "properties": {
+                    "loc": {
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "type": "array",
+                        "title": "Location"
+                    },
+                    "msg": {
+                        "type": "string",
+                        "title": "Message"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "Error Type"
+                    },
+                    "input": {
+                        "title": "Input"
+                    },
+                    "ctx": {
+                        "type": "object",
+                        "title": "Context"
+                    }
+                },
+                "type": "object",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "title": "ValidationError"
+            }
+        }
+    }
+}

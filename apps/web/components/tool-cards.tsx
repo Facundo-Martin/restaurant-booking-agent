@@ -228,6 +228,10 @@ export function TimeDisplayCard({
 // --- Tool Loading Indicator ---
 export function ToolLoadingIndicator({ toolName }: { toolName: string }) {
   const labelMap: Record<string, { label: string; icon: React.ReactNode }> = {
+    retrieve: {
+      label: 'Searching knowledge base...',
+      icon: <Search className="size-3.5" />,
+    },
     retrieveRestaurantInfo: {
       label: 'Searching restaurants...',
       icon: <Search className="size-3.5" />,

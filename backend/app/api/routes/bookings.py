@@ -8,7 +8,7 @@ from app.repositories import bookings as booking_repo
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
 
-@router.get("/{booking_id}", response_model=Booking)
+@router.get("/{booking_id}", response_model=Booking, operation_id="getBooking")
 async def get_booking(
     booking_id: str,
     restaurant_name: str = Query(..., description="Required — part of the composite key"),
@@ -24,7 +24,7 @@ async def get_booking(
     return booking
 
 
-@router.delete("/{booking_id}", status_code=204)
+@router.delete("/{booking_id}", status_code=204, operation_id="deleteBooking")
 async def delete_booking(
     booking_id: str,
     restaurant_name: str = Query(..., description="Required — part of the composite key"),
