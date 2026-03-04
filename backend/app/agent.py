@@ -10,7 +10,7 @@ import os
 from strands.models import BedrockModel
 from strands_tools import current_time, retrieve
 
-from app.config import KB_ID
+from app.config import GUARDRAIL_ID, GUARDRAIL_VERSION, KB_ID
 from app.tools.bookings import create_booking, delete_booking, get_booking_details
 
 # The retrieve tool reads KNOWLEDGE_BASE_ID from the environment.
@@ -28,9 +28,23 @@ the knowledge base. Use current_time when date context is needed.
 
 # Cached at module level — BedrockModel is stateless (no conversation state).
 # Creating it once per cold start avoids repeated credential resolution overhead.
+#
+# Guardrail is attached when BEDROCK_GUARDRAIL_ID is set in the environment.
+# Bedrock evaluates the guardrail before every model response, blocking prompt
+# injection, PII leakage, and off-topic content at the API layer.
+# Leave unset in local dev; configure via SST link once a guardrail is deployed.
 model = BedrockModel(
     model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
     additional_request_fields={"thinking": {"type": "disabled"}},
+    **(
+        {
+            "guardrail_id": GUARDRAIL_ID,
+            "guardrail_version": GUARDRAIL_VERSION,
+            "guardrail_trace": "enabled",
+        }
+        if GUARDRAIL_ID
+        else {}
+    ),
 )
 
 # All tools available to the agent — stateless, safe to share across requests.
