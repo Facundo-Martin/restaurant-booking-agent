@@ -1,5 +1,6 @@
 """FastAPI application factory."""
 
+import asyncio
 import os
 
 from fastapi import FastAPI, HTTPException, Request
@@ -17,6 +18,7 @@ from app.middleware import (
     get_correlation_id,
 )
 from app.models.schemas import ErrorDetail, ErrorResponse
+from app.repositories import bookings as booking_repo
 
 # Disable interactive docs on the live Lambda — /docs and /openapi.json are
 # accessible to anyone with the Function URL and serve no purpose in production.
@@ -117,10 +119,39 @@ async def unhandled_exception_handler(
     )
 
 
+_HEALTH_TIMEOUT = 2.0  # seconds per dependency probe
+
+
 @app.get("/health", operation_id="healthCheck")
-def health() -> dict:
-    """Return a simple liveness check response."""
-    return {"status": "ok"}
+async def health() -> JSONResponse:
+    """Liveness + shallow dependency check.
+
+    Probes DynamoDB with describe_table (no data read, no cost).
+    Returns 200 when all checks pass, 503 when any dependency is unreachable.
+    Bedrock and Knowledge Base are excluded — any probe would incur a model
+    invocation cost; they are listed in not_checked so operators know exactly
+    what 'ok' covers.
+    """
+    dynamodb_status = "ok"
+    try:
+        await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(None, booking_repo.ping),
+            timeout=_HEALTH_TIMEOUT,
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.warning("Health check: DynamoDB unreachable")
+        dynamodb_status = "error"
+
+    overall = "ok" if dynamodb_status == "ok" else "degraded"
+    status_code = 200 if overall == "ok" else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": overall,
+            "dependencies": {"dynamodb": dynamodb_status},
+            "not_checked": ["bedrock", "knowledge_base"],
+        },
+    )
 
 
 @app.api_route(

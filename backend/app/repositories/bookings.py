@@ -55,3 +55,8 @@ def delete(booking_id: str, restaurant_name: str) -> bool:
         return True
     except _table.meta.client.exceptions.ConditionalCheckFailedException:
         return False
+
+
+def ping() -> None:
+    """Lightweight DynamoDB reachability check — raises on any error."""
+    _table.meta.client.describe_table(TableName=TABLE_NAME)

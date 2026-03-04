@@ -62,10 +62,25 @@ def collect_sse_events(response) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def test_health():
-    response = client.get("/health")
+def test_health_ok():
+    """Returns 200 with full dependency shape when DynamoDB is reachable."""
+    with patch("app.repositories.bookings.ping"):
+        response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["dependencies"]["dynamodb"] == "ok"
+    assert "bedrock" in body["not_checked"]
+
+
+def test_health_degraded():
+    """Returns 503 with status=degraded when DynamoDB probe fails."""
+    with patch("app.repositories.bookings.ping", side_effect=Exception("unreachable")):
+        response = client.get("/health")
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert body["dependencies"]["dynamodb"] == "error"
 
 
 # ---------------------------------------------------------------------------
