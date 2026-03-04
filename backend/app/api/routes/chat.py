@@ -10,6 +10,7 @@ from strands import Agent
 
 from app.agent import SYSTEM_PROMPT, TOOLS, model
 from app.logging import logger
+from app.metrics import MetricUnit, metrics
 from app.middleware import get_correlation_id
 from app.models.schemas import ChatApiRequest
 router = APIRouter(tags=["chat"])
@@ -114,17 +115,24 @@ async def generate_chat_events(request: ChatApiRequest) -> AsyncGenerator[Server
             if event.get("force_stop"):
                 reason = event.get("force_stop_reason", "Agent stopped unexpectedly")
                 logger.warning("Agent force-stopped", extra={"reason": reason, "correlation_id": get_correlation_id()})
+                metrics.add_metric(name="AgentError", unit=MetricUnit.Count, value=1)
                 yield ServerSentEvent(data=json.dumps({"type": "error", "error": str(reason)}))
 
     except Exception:
         logger.exception("Agent stream error", extra={"correlation_id": get_correlation_id()})
+        metrics.add_metric(name="AgentError", unit=MetricUnit.Count, value=1)
         yield ServerSentEvent(data=json.dumps({"type": "error", "error": "An unexpected error occurred."}))
     finally:
+        # Flush EMF metrics manually — the chat Lambda runs under LWA+uvicorn so
+        # @metrics.log_metrics never executes; the generator finally block is the
+        # only reliable flush point for every request.
+        metrics.flush_metrics()
         yield ServerSentEvent(data=json.dumps({"type": "done"}))
 
 
 @router.post("/chat", operation_id="streamChat")
 async def stream_chat(request: ChatApiRequest) -> EventSourceResponse:
+    metrics.add_metric(name="ChatRequest", unit=MetricUnit.Count, value=1)
     logger.info(
         "POST /chat",
         extra={
