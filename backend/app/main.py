@@ -50,7 +50,8 @@ app.include_router(bookings.router)
 
 
 @app.exception_handler(AppException)
-async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+async def app_exception_handler(_request: Request, exc: AppException) -> JSONResponse:
+    """Translate AppException into a structured JSON error response."""
     return JSONResponse(
         status_code=exc.status_code,
         content=ErrorResponse(
@@ -62,9 +63,10 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+async def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
     # Covers FastAPI's own internal exceptions (405 Method Not Allowed, etc.)
     # that are never raised as AppException, keeping the error shape consistent.
+    """Translate FastAPI HTTPException into a structured JSON error response."""
     return JSONResponse(
         status_code=exc.status_code,
         content=ErrorResponse(
@@ -79,8 +81,9 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
-    request: Request, exc: RequestValidationError
+    _request: Request, _exc: RequestValidationError
 ) -> JSONResponse:
+    """Return 422 with a consistent error envelope for Pydantic validation failures."""
     return JSONResponse(
         status_code=422,
         content=ErrorResponse(
@@ -94,7 +97,10 @@ async def validation_exception_handler(
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def unhandled_exception_handler(
+    request: Request, _exc: Exception
+) -> JSONResponse:
+    """Log and return 500 for any unhandled exception, without leaking internals."""
     logger.exception(
         "Unhandled exception",
         extra={"path": request.url.path, "method": request.method},

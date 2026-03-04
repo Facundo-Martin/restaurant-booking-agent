@@ -12,6 +12,8 @@ from app.config import (
 
 
 class ErrorDetail(BaseModel):
+    """Fields included in every error response body."""
+
     code: str
     message: str
     request_id: str | None = None  # populated once correlation ID middleware is added

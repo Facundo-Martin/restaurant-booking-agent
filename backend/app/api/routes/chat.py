@@ -19,7 +19,7 @@ from app.models.schemas import ChatApiRequest
 router = APIRouter(tags=["chat"])
 
 
-async def generate_chat_events(
+async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
     request: ChatApiRequest,
 ) -> AsyncGenerator[ServerSentEvent, None]:
     """Yield SSE events from a Strands agent stream for a single chat request.
@@ -172,7 +172,7 @@ async def generate_chat_events(
                 {"type": "error", "error": "Request timed out. Please try again."}
             )
         )
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         logger.exception(
             "Agent stream error", extra={"correlation_id": get_correlation_id()}
         )
@@ -190,6 +190,7 @@ async def generate_chat_events(
 
 @router.post("/chat", operation_id="streamChat")
 async def stream_chat(request: ChatApiRequest) -> EventSourceResponse:
+    """Accept a chat request and return a streaming SSE response."""
     metrics.add_metric(name="ChatRequest", unit=MetricUnit.Count, value=1)
     logger.info(
         "POST /chat",

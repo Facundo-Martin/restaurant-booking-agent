@@ -1,3 +1,9 @@
+"""AWS Lambda entry point for bookings routes (GET /bookings/:id, DELETE /bookings/:id).
+
+Unlike the chat Lambda which runs under Lambda Web Adapter + uvicorn, this handler
+is invoked directly by API Gateway through Mangum.
+"""
+
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from mangum import Mangum
 from mangum.types import LambdaEvent
@@ -22,4 +28,5 @@ _mangum_handler = Mangum(app, lifespan="off")
 @tracer.capture_lambda_handler
 @metrics.log_metrics(capture_cold_start_metric=True)
 def handler(event: LambdaEvent, context: LambdaContext) -> dict:
+    """Proxy the Lambda event to the FastAPI application via Mangum."""
     return _mangum_handler(event, context)

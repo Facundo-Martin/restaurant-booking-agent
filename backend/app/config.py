@@ -1,3 +1,5 @@
+"""Application configuration loaded from SST Resource links at deploy time."""
+
 import os
 
 from sst import Resource

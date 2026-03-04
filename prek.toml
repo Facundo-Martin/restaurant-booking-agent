@@ -29,6 +29,25 @@ hooks = [
 ]
 
 # ---------------------------------------------------------------------------
+# Python — pylint (backend/app/ only; tests are excluded)
+# Uses the venv binary directly so no uv overhead and no CWD ambiguity.
+# Config is loaded from backend/pyproject.toml via --rcfile.
+# ---------------------------------------------------------------------------
+[[repos]]
+repo = "local"
+hooks = [
+  {
+    id = "pylint",
+    name = "pylint",
+    entry = "backend/.venv/bin/pylint",
+    language = "system",
+    types = ["python"],
+    files = "^backend/app/",
+    args = ["--rcfile=backend/pyproject.toml"],
+  },
+]
+
+# ---------------------------------------------------------------------------
 # General file hygiene — Rust-native built-ins, no network or setup required
 # ---------------------------------------------------------------------------
 [[repos]]
