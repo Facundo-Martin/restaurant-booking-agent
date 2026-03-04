@@ -240,6 +240,21 @@ def test_chat_missing_messages_field():
     assert response.status_code == 422
 
 
+def test_chat_message_content_too_long():
+    """A message exceeding 4 096 characters is rejected before hitting the agent."""
+    oversized = {"messages": [{"role": "user", "content": "x" * 4097}]}
+    response = client.post("/chat", json=oversized)
+    assert response.status_code == 422
+
+
+def test_chat_too_many_messages():
+    """More than 50 messages in one request is rejected before hitting the agent."""
+    msg = {"role": "user", "content": "Hi"}
+    too_many = {"messages": [msg] * 51}
+    response = client.post("/chat", json=too_many)
+    assert response.status_code == 422
+
+
 def test_chat_done_is_always_last():
     """done is emitted even when the stream produces no other events."""
     mock_agent = make_mock_agent([])
