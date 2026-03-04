@@ -1,6 +1,6 @@
 # Taking the Backend Toward Production
 
-> **Status: sections 4–7 and 10 implemented. Section 8 (security) is next.**
+> **Status: sections 4–10 implemented. Section 11 (health check) is next.**
 
 References:
 - [Preparing FastAPI for Production](https://medium.com/@ramanbazhanau/preparing-fastapi-for-production-a-comprehensive-guide-d167e693aa2b)
@@ -328,39 +328,138 @@ Every log call and every `ErrorDetail` response now carries `request_id=get_corr
 
 ---
 
-## 8. Security
+## 8. Security ✅
 
 _Low-effort hardening that covers the most common scanner findings and prevents accidental info disclosure in production._
 
-### 8a. Security response headers
+### 8a. Security response headers ✅
 
-_Add `SecurityHeadersMiddleware` that sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and `X-XSS-Protection: 1; mode=block` on every response. `Strict-Transport-Security` is better set at API Gateway / CloudFront level — not here._
+`app/middleware.py` — `SecurityHeadersMiddleware` appended to every response:
 
-### 8b. Disabling OpenAPI docs in production Lambda
+```python
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",   # prevents MIME-type sniffing
+    "X-Frame-Options": "DENY",             # blocks clickjacking via iframes
+    "Referrer-Policy": "no-referrer",      # avoids leaking API URLs in Referer
+    "X-XSS-Protection": "1; mode=block",  # legacy filter for older browsers
+}
 
-_`/docs` and `/openapi.json` are accessible to anyone with the Function URL. Gate them with the `AWS_LAMBDA_FUNCTION_NAME` check already used for CORS: pass `docs_url=None` and `openapi_url=None` to `FastAPI(...)` when running in Lambda. The TypeScript client is regenerated from a local dev server — the live endpoint doesn't need to expose the spec._
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        response.headers.update(_SECURITY_HEADERS)
+        return response
+```
+
+`Strict-Transport-Security` is intentionally omitted — it belongs at the API Gateway / CloudFront layer. `Content-Security-Policy` belongs on the Next.js frontend (no HTML served from this API). Headers are set manually (not via a library) because there are only five static values with no variance per route.
+
+Registered as the outermost middleware in `main.py` so it wraps every response including health checks:
+
+```python
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(CorrelationIdMiddleware)  # runs inside SecurityHeaders
+```
+
+### 8b. Disabling OpenAPI docs in production Lambda ✅
+
+`app/main.py` — gated by `AWS_LAMBDA_FUNCTION_NAME` (same env var already used for CORS):
+
+```python
+_in_lambda = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+
+app = FastAPI(
+    docs_url=None if _in_lambda else "/docs",
+    redoc_url=None if _in_lambda else "/redoc",
+    openapi_url=None if _in_lambda else "/openapi.json",
+)
+```
+
+The TypeScript client is regenerated from a local dev server — the live Lambda endpoint does not need to expose the spec.
 
 ### 8c. Tightening CORS
 
-_Both API Gateway (`infra/api.ts` line 8) and the Function URL (line 42) currently use `allowOrigins: ["*"]`. The infra TODO already calls this out. Once the Vercel frontend domain is known, restrict both to that origin. The FastAPI CORS middleware (local dev only) is already scoped to `localhost:3000` — no changes needed there._
+_Pending — blocked on knowing the Vercel frontend domain. Both API Gateway (`infra/api.ts`) and the Function URL currently use `allowOrigins: ["*"]`. Once the domain is known, update both. Section 12 covers this alongside WAF._
 
-### 8d. Agent prompt injection mitigations
+### 8d. Agent prompt injection mitigations ✅
 
-_User input passes directly to `agent.stream_async` — a crafted message can attempt to override the system prompt. Document the mitigations in place (system prompt structure, tool docstrings as a separate authority). Introduce **Bedrock Guardrails** as the next layer: content filters evaluated before the model sees the input. Show how to attach a guardrail ID to `BedrockModel` in `agent.py`._
+**Bedrock Guardrails** — optional, zero-code-path-change when no guardrail is configured:
+
+`app/config.py`:
+```python
+GUARDRAIL_ID: str | None = os.environ.get("BEDROCK_GUARDRAIL_ID")
+GUARDRAIL_VERSION: str = os.environ.get("BEDROCK_GUARDRAIL_VERSION", "DRAFT")
+```
+
+`app/agent.py` — `**({...} if GUARDRAIL_ID else {})` is conditional keyword unpacking; avoids passing `None` to params that require real values:
+```python
+model = BedrockModel(
+    model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+    additional_request_fields={"thinking": {"type": "disabled"}},
+    **(
+        {
+            "guardrail_id": GUARDRAIL_ID,
+            "guardrail_version": GUARDRAIL_VERSION,
+            "guardrail_trace": "enabled",
+        }
+        if GUARDRAIL_ID
+        else {}
+    ),
+)
+```
+
+When `BEDROCK_GUARDRAIL_ID` is set (via SST env var at deploy time), every model invocation is evaluated by the guardrail before the response reaches the agent. `GUARDRAIL_VERSION` defaults to `"DRAFT"` so the latest saved version is used automatically during the authoring phase.
+
+**Sources:**
+- [Starlette BaseHTTPMiddleware](https://www.starlette.io/middleware/)
+- [Bedrock Guardrails](https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails.html)
 
 ---
 
-## 9. Resilience
+## 9. Resilience ✅
 
 _Bounds on how long and how hard the service will try before giving up._
 
-### 9a. Agent stream timeout
+### 9a. Agent stream timeout ✅
 
-_Wrap `agent.stream_async(user_message)` in `asyncio.wait_for(..., timeout=MAX_AGENT_SECONDS)` where `MAX_AGENT_SECONDS` lives in `config.py` (e.g., 110 seconds — leaving headroom before the 120-second Lambda timeout). When `asyncio.TimeoutError` fires, raise `AppException` with code `"AGENT_TIMEOUT"`, which the SSE error handler in section 5c converts to a structured error event before emitting `done`._
+`app/config.py`:
+```python
+MAX_AGENT_SECONDS: int = 110  # 10s headroom before the 120s Lambda timeout
+```
 
-### 9b. Bedrock throttling and retry behaviour
+`app/api/routes/chat.py` — `asyncio.timeout` (Python 3.11+) wraps the entire stream iteration. When Bedrock hangs or retries exhaust time, `TimeoutError` is caught and converted to a structured SSE error event, then `done` is always emitted in `finally`:
 
-_`BedrockModel` delegates to boto3, which applies `standard` retry mode with exponential backoff by default. Show how to verify this is in effect and set `max_attempts` explicitly if needed. Explain why the agent-level timeout in 9a is still necessary even with retries: retries multiply the potential wait time, they don't bound it._
+```python
+try:
+    async with asyncio.timeout(MAX_AGENT_SECONDS):
+        async for event in agent.stream_async(user_message):
+            ...
+except TimeoutError:
+    logger.warning("Agent stream timed out", extra={"timeout_seconds": MAX_AGENT_SECONDS})
+    metrics.add_metric(name="AgentError", unit=MetricUnit.Count, value=1)
+    yield ServerSentEvent(data=json.dumps({"type": "error", "error": "Request timed out. Please try again."}))
+finally:
+    metrics.flush_metrics()
+    yield ServerSentEvent(data=json.dumps({"type": "done"}))
+```
+
+The `finally` block guarantees `done` is always the last event — even on timeout or unhandled exception.
+
+### 9b. Bedrock throttling and retry behaviour ✅
+
+`app/agent.py` — boto3 retry mode set via environment variables at module load time. `setdefault` is used so an operator can override them in the SST environment without touching code:
+
+```python
+os.environ.setdefault("AWS_RETRY_MODE", "standard")  # exponential backoff
+os.environ.setdefault("AWS_MAX_ATTEMPTS", "3")        # 1 initial + 2 retries
+```
+
+These are internal boto3 constants, not resource bindings — they belong in code, not SST's `environment` block (which is for cross-cutting Lambda config like `POWERTOOLS_SERVICE_NAME`).
+
+**Why the timeout in 9a is still necessary even with retries:** retries multiply the potential wait time, they don't bound it. A 30-second Bedrock call with 3 attempts could run for 90+ seconds, blowing past the Lambda timeout and producing no `done` event.
+
+**Sources:**
+- [asyncio.timeout (Python 3.11)](https://docs.python.org/3/library/asyncio-task.html#asyncio.timeout)
+- [boto3 retry configuration](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/retries.html)
 
 ---
 
@@ -538,6 +637,68 @@ _A GitHub Actions pipeline that enforces quality gates before every deployment. 
 ### 15a. Pipeline overview
 
 _Five stages in order: **lint** → **unit tests** → **sst diff** → **deploy staging** → **promote prod**. The diff stage surfaces infra changes before they apply. Production promotion is a separate, manually triggered job._
+
+### 15a-pre. Pre-commit hooks (prek) ✅
+
+Developer-side quality gate that runs before every `git commit`. Uses [prek](https://github.com/j178/prek) — a Rust-native drop-in for pre-commit with no Python dependency.
+
+`prek.toml` at repo root:
+
+```toml
+fail_fast = false
+default_language_version = { python = "3.11" }
+
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.15.2"
+hooks = [
+  { id = "ruff", args = ["--fix"], files = "^backend/" },
+  { id = "ruff-format", files = "^backend/" },
+]
+
+[[repos]]
+repo = "local"
+hooks = [
+  {
+    id = "pylint", name = "pylint",
+    entry = "backend/.venv/bin/pylint", language = "system",
+    types = ["python"], files = "^backend/app/",
+    args = ["--rcfile=backend/pyproject.toml"],
+  },
+]
+
+[[repos]]
+repo = "builtin"
+hooks = [
+  { id = "trailing-whitespace" },
+  { id = "end-of-file-fixer" },
+  { id = "check-yaml" }, { id = "check-toml" }, { id = "check-json" },
+  { id = "detect-private-key" },
+  { id = "no-commit-to-branch", args = ["--branch", "main"] },
+]
+```
+
+pylint config in `backend/pyproject.toml` — globally disables rules that overlap with ruff or are false positives for this codebase:
+
+```toml
+[tool.pylint.messages_control]
+disable = [
+    "C0301",  # line-too-long — ruff handles
+    "R0801",  # duplicate-code — false positive on similar Pydantic field lists
+    "R0903",  # too-few-public-methods — Starlette middleware only needs dispatch()
+]
+```
+
+Intentional complexity in `generate_chat_events` is suppressed inline (not globally):
+```python
+async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+```
+
+One-time developer setup:
+```bash
+uv tool install prek
+prek install   # wires .git/hooks/pre-commit
+```
 
 ### 15b. Lint and unit tests
 
