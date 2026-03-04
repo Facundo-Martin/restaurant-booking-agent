@@ -26,6 +26,17 @@ When a user asks about restaurants or menus, use the retrieve tool to search
 the knowledge base. Use current_time when date context is needed.
 """
 
+# boto3 retry configuration — set via environment variables so they apply to
+# every boto3 client Strands creates internally (BedrockModel, retrieve tool).
+# "standard" mode: exponential backoff with jitter, up to 3 total attempts.
+# This handles transient Bedrock throttling (429) and service errors (5xx).
+# setdefault respects values already injected by the Lambda execution environment.
+#
+# Note: retries multiply potential wait time — they do NOT bound it. The hard
+# upper bound is asyncio.timeout(MAX_AGENT_SECONDS) in chat.py.
+os.environ.setdefault("AWS_RETRY_MODE", "standard")
+os.environ.setdefault("AWS_MAX_ATTEMPTS", "3")
+
 # Cached at module level — BedrockModel is stateless (no conversation state).
 # Creating it once per cold start avoids repeated credential resolution overhead.
 #
