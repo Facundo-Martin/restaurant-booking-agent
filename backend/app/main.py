@@ -1,8 +1,8 @@
 """FastAPI application factory."""
 
-import logging
 import os
 
+from aws_lambda_powertools import Logger
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,9 +11,10 @@ from fastapi.routing import APIRoute
 
 from app.api.routes import bookings, chat
 from app.exceptions import AppException
+from app.middleware import CorrelationIdMiddleware, get_correlation_id
 from app.models.schemas import ErrorDetail, ErrorResponse
 
-logger = logging.getLogger(__name__)
+logger = Logger(service="restaurant-booking")
 
 app = FastAPI(
     title="Restaurant Booking Agent",
@@ -23,6 +24,8 @@ app = FastAPI(
 
 # CORS — only needed in local dev. In production, Lambda Function URL config
 # and API Gateway handle CORS before the request reaches FastAPI.
+app.add_middleware(CorrelationIdMiddleware)
+
 if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
     app.add_middleware(
         CORSMiddleware,
@@ -40,7 +43,7 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
     return JSONResponse(
         status_code=exc.status_code,
         content=ErrorResponse(
-            error=ErrorDetail(code=exc.code, message=exc.message)
+            error=ErrorDetail(code=exc.code, message=exc.message, request_id=get_correlation_id())
         ).model_dump(),
     )
 
@@ -52,7 +55,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     return JSONResponse(
         status_code=exc.status_code,
         content=ErrorResponse(
-            error=ErrorDetail(code="HTTP_ERROR", message=str(exc.detail))
+            error=ErrorDetail(code="HTTP_ERROR", message=str(exc.detail), request_id=get_correlation_id())
         ).model_dump(),
     )
 
@@ -62,18 +65,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(
         status_code=422,
         content=ErrorResponse(
-            error=ErrorDetail(code="VALIDATION_ERROR", message="Request validation failed.")
+            error=ErrorDetail(code="VALIDATION_ERROR", message="Request validation failed.", request_id=get_correlation_id())
         ).model_dump(),
     )
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    logger.exception("Unhandled exception", extra={"path": request.url.path, "method": request.method})
     return JSONResponse(
         status_code=500,
         content=ErrorResponse(
-            error=ErrorDetail(code="INTERNAL_ERROR", message="An unexpected error occurred.")
+            error=ErrorDetail(code="INTERNAL_ERROR", message="An unexpected error occurred.", request_id=get_correlation_id())
         ).model_dump(),
     )
 

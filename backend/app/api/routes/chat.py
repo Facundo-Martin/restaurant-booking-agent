@@ -1,18 +1,19 @@
 """POST /chat — SSE streaming via Strands agent.stream_async."""
 
 import json
-import logging
 from collections.abc import AsyncGenerator
 from typing import Any
 
+from aws_lambda_powertools import Logger
 from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 from strands import Agent
 
 from app.agent import SYSTEM_PROMPT, TOOLS, model
+from app.middleware import get_correlation_id
 from app.models.schemas import ChatApiRequest
 
-logger = logging.getLogger(__name__)
+logger = Logger(service="restaurant-booking")
 router = APIRouter(tags=["chat"])
 
 
@@ -114,11 +115,11 @@ async def generate_chat_events(request: ChatApiRequest) -> AsyncGenerator[Server
             # --- Agent forced to stop (token limit, guardrail, etc.) ---
             if event.get("force_stop"):
                 reason = event.get("force_stop_reason", "Agent stopped unexpectedly")
-                logger.warning("Agent force-stopped: %s", reason)
+                logger.warning("Agent force-stopped", extra={"reason": reason, "correlation_id": get_correlation_id()})
                 yield ServerSentEvent(data=json.dumps({"type": "error", "error": str(reason)}))
 
     except Exception:
-        logger.exception("Agent stream error")
+        logger.exception("Agent stream error", extra={"correlation_id": get_correlation_id()})
         yield ServerSentEvent(data=json.dumps({"type": "error", "error": "An unexpected error occurred."}))
     finally:
         yield ServerSentEvent(data=json.dumps({"type": "done"}))
@@ -127,9 +128,12 @@ async def generate_chat_events(request: ChatApiRequest) -> AsyncGenerator[Server
 @router.post("/chat", operation_id="streamChat")
 async def stream_chat(request: ChatApiRequest) -> EventSourceResponse:
     logger.info(
-        "POST /chat — %d message(s), last: %.80r",
-        len(request.messages),
-        request.messages[-1].content if request.messages else "",
+        "POST /chat",
+        extra={
+            "message_count": len(request.messages),
+            "last_message_preview": (request.messages[-1].content[:80] if request.messages else ""),
+            "correlation_id": get_correlation_id(),
+        },
     )
     return EventSourceResponse(
         generate_chat_events(request),
