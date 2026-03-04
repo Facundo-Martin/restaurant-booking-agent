@@ -1,7 +1,8 @@
 """REST endpoints for direct booking management."""
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
+from app.exceptions import AppException
 from app.models.schemas import Booking
 from app.repositories import bookings as booking_repo
 
@@ -20,7 +21,7 @@ async def get_booking(
     """
     booking = booking_repo.get(booking_id, restaurant_name)
     if not booking:
-        raise HTTPException(status_code=404, detail=f"Booking {booking_id} not found.")
+        raise AppException(status_code=404, code="BOOKING_NOT_FOUND", message=f"Booking {booking_id} not found.")
     return booking
 
 
@@ -36,4 +37,4 @@ async def delete_booking(
     """
     deleted = booking_repo.delete(booking_id, restaurant_name)
     if not deleted:
-        raise HTTPException(status_code=404, detail=f"Booking {booking_id} not found.")
+        raise AppException(status_code=404, code="BOOKING_NOT_FOUND", message=f"Booking {booking_id} not found.")

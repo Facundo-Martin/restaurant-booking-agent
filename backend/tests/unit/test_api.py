@@ -214,6 +214,9 @@ def test_chat_exception_yields_error_then_done():
 
     types = [e["type"] for e in events]
     assert types == ["error", "done"]
+    # Internal exception message must never leak to the client.
+    assert "Bedrock unavailable" not in events[0]["error"]
+    assert events[0]["error"] == "An unexpected error occurred."
 
 
 def test_chat_force_stop_yields_error_then_done():

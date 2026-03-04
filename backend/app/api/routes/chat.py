@@ -117,9 +117,9 @@ async def generate_chat_events(request: ChatApiRequest) -> AsyncGenerator[Server
                 logger.warning("Agent force-stopped: %s", reason)
                 yield ServerSentEvent(data=json.dumps({"type": "error", "error": str(reason)}))
 
-    except Exception as exc:
+    except Exception:
         logger.exception("Agent stream error")
-        yield ServerSentEvent(data=json.dumps({"type": "error", "error": str(exc)}))
+        yield ServerSentEvent(data=json.dumps({"type": "error", "error": "An unexpected error occurred."}))
     finally:
         yield ServerSentEvent(data=json.dumps({"type": "done"}))
 
