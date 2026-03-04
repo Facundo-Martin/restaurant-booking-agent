@@ -21,7 +21,9 @@ _SAMPLE_BOOKING = Booking(
 
 def test_get_booking_details_found():
     with patch("app.repositories.bookings.get", return_value=_SAMPLE_BOOKING):
-        result = get_booking_details(booking_id="abc-123", restaurant_name="Nonna's Hearth")
+        result = get_booking_details(
+            booking_id="abc-123", restaurant_name="Nonna's Hearth"
+        )
 
     assert result["booking_id"] == "abc-123"
     assert result["party_size"] == 2

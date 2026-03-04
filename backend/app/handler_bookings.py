@@ -3,9 +3,9 @@ from mangum import Mangum
 from mangum.types import LambdaEvent
 
 from app.logging import logger
+from app.main import app
 from app.metrics import metrics
 from app.tracer import tracer
-from app.main import app
 
 # Separate entry point from handler_chat.py so SST can size each Lambda independently:
 # - handler_chat:    120s timeout, 1024MB memory (multi-turn Bedrock agent)

@@ -20,7 +20,11 @@ def get_booking_details(booking_id: str, restaurant_name: str) -> dict:
         The booking details, or a message if not found.
     """
     booking = booking_repo.get(booking_id, restaurant_name)
-    return booking.model_dump() if booking else {"error": f"No booking found with ID {booking_id}"}
+    return (
+        booking.model_dump()
+        if booking
+        else {"error": f"No booking found with ID {booking_id}"}
+    )
 
 
 @tool

@@ -12,7 +12,9 @@ router = APIRouter(prefix="/bookings", tags=["bookings"])
 @router.get("/{booking_id}", response_model=Booking, operation_id="getBooking")
 async def get_booking(
     booking_id: str,
-    restaurant_name: str = Query(..., description="Required — part of the composite key"),
+    restaurant_name: str = Query(
+        ..., description="Required — part of the composite key"
+    ),
 ) -> Booking:
     """Retrieve a booking by ID.
 
@@ -21,14 +23,20 @@ async def get_booking(
     """
     booking = booking_repo.get(booking_id, restaurant_name)
     if not booking:
-        raise AppException(status_code=404, code="BOOKING_NOT_FOUND", message=f"Booking {booking_id} not found.")
+        raise AppException(
+            status_code=404,
+            code="BOOKING_NOT_FOUND",
+            message=f"Booking {booking_id} not found.",
+        )
     return booking
 
 
 @router.delete("/{booking_id}", status_code=204, operation_id="deleteBooking")
 async def delete_booking(
     booking_id: str,
-    restaurant_name: str = Query(..., description="Required — part of the composite key"),
+    restaurant_name: str = Query(
+        ..., description="Required — part of the composite key"
+    ),
 ) -> None:
     """Delete a booking by ID.
 
@@ -37,4 +45,8 @@ async def delete_booking(
     """
     deleted = booking_repo.delete(booking_id, restaurant_name)
     if not deleted:
-        raise AppException(status_code=404, code="BOOKING_NOT_FOUND", message=f"Booking {booking_id} not found.")
+        raise AppException(
+            status_code=404,
+            code="BOOKING_NOT_FOUND",
+            message=f"Booking {booking_id} not found.",
+        )

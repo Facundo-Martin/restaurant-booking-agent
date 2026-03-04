@@ -33,6 +33,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.update(_SECURITY_HEADERS)
         return response
 
+
 # One correlation ID per async context — safe across concurrent requests.
 # ContextVar resets automatically when the async context ends, so there is
 # no bleed between Lambda invocations that reuse the same execution environment.

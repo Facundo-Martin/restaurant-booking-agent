@@ -40,8 +40,12 @@ def test_create_with_special_requests(dynamodb_table):
 
 
 def test_create_generates_unique_ids(dynamodb_table):
-    b1 = booking_repo.create(restaurant_name="Ember & Vine", user_id="u1", date="2026-03-01", party_size=2)
-    b2 = booking_repo.create(restaurant_name="Ember & Vine", user_id="u2", date="2026-03-02", party_size=4)
+    b1 = booking_repo.create(
+        restaurant_name="Ember & Vine", user_id="u1", date="2026-03-01", party_size=2
+    )
+    b2 = booking_repo.create(
+        restaurant_name="Ember & Vine", user_id="u2", date="2026-03-02", party_size=4
+    )
 
     assert b1.booking_id != b2.booking_id
 

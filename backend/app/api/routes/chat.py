@@ -15,10 +15,13 @@ from app.logging import logger
 from app.metrics import MetricUnit, metrics
 from app.middleware import get_correlation_id
 from app.models.schemas import ChatApiRequest
+
 router = APIRouter(tags=["chat"])
 
 
-async def generate_chat_events(request: ChatApiRequest) -> AsyncGenerator[ServerSentEvent, None]:
+async def generate_chat_events(
+    request: ChatApiRequest,
+) -> AsyncGenerator[ServerSentEvent, None]:
     """Yield SSE events from a Strands agent stream for a single chat request.
 
     The Agent is created per request to isolate conversation state between
@@ -50,11 +53,15 @@ async def generate_chat_events(request: ChatApiRequest) -> AsyncGenerator[Server
         async with asyncio.timeout(MAX_AGENT_SECONDS):
             agent_stream = agent.stream_async(user_message)
             async for event in agent_stream:
-                event: dict[str, Any]  # TypedEvent (dict subclass); stream_async types as Any
+                event: dict[
+                    str, Any
+                ]  # TypedEvent (dict subclass); stream_async types as Any
 
                 # --- Text tokens ---
                 if "data" in event:
-                    yield ServerSentEvent(data=json.dumps({"type": "text-delta", "delta": event["data"]}))
+                    yield ServerSentEvent(
+                        data=json.dumps({"type": "text-delta", "delta": event["data"]})
+                    )
 
                 # --- Tool lifecycle ---
                 # Strands emits a "message" event twice per tool cycle:
@@ -72,12 +79,16 @@ async def generate_chat_events(request: ChatApiRequest) -> AsyncGenerator[Server
                                 tool_id = tool_use["toolUseId"]
                                 tool_name = tool_use["name"]
                                 tool_names[tool_id] = tool_name
-                                yield ServerSentEvent(data=json.dumps({
-                                    "type": "tool-call-start",
-                                    "toolCallId": tool_id,
-                                    "toolName": tool_name,
-                                    "input": tool_use.get("input") or {},
-                                }))
+                                yield ServerSentEvent(
+                                    data=json.dumps(
+                                        {
+                                            "type": "tool-call-start",
+                                            "toolCallId": tool_id,
+                                            "toolName": tool_name,
+                                            "input": tool_use.get("input") or {},
+                                        }
+                                    )
+                                )
 
                     elif role == "user":
                         for block in content:
@@ -95,43 +106,80 @@ async def generate_chat_events(request: ChatApiRequest) -> AsyncGenerator[Server
                                     output["text"] = result_content["text"]
                                 if "json" in result_content:
                                     json_val = result_content["json"]
-                                    output.update(json_val if isinstance(json_val, dict) else {"result": json_val})
+                                    output.update(
+                                        json_val
+                                        if isinstance(json_val, dict)
+                                        else {"result": json_val}
+                                    )
 
                             sse_payload: dict[str, Any] = {
                                 "toolCallId": tool_id,
                                 "toolName": tool_names.get(tool_id, ""),
                             }
                             if status == "error":
-                                yield ServerSentEvent(data=json.dumps({
-                                    **sse_payload,
-                                    "type": "tool-error",
-                                    "error": output.get("text", "Tool execution failed"),
-                                }))
+                                yield ServerSentEvent(
+                                    data=json.dumps(
+                                        {
+                                            **sse_payload,
+                                            "type": "tool-error",
+                                            "error": output.get(
+                                                "text", "Tool execution failed"
+                                            ),
+                                        }
+                                    )
+                                )
                             else:
-                                yield ServerSentEvent(data=json.dumps({
-                                    **sse_payload,
-                                    "type": "tool-result",
-                                    "output": output,
-                                }))
+                                yield ServerSentEvent(
+                                    data=json.dumps(
+                                        {
+                                            **sse_payload,
+                                            "type": "tool-result",
+                                            "output": output,
+                                        }
+                                    )
+                                )
 
                 # --- Agent forced to stop (token limit, guardrail, etc.) ---
                 if event.get("force_stop"):
-                    reason = event.get("force_stop_reason", "Agent stopped unexpectedly")
-                    logger.warning("Agent force-stopped", extra={"reason": reason, "correlation_id": get_correlation_id()})
-                    metrics.add_metric(name="AgentError", unit=MetricUnit.Count, value=1)
-                    yield ServerSentEvent(data=json.dumps({"type": "error", "error": str(reason)}))
+                    reason = event.get(
+                        "force_stop_reason", "Agent stopped unexpectedly"
+                    )
+                    logger.warning(
+                        "Agent force-stopped",
+                        extra={
+                            "reason": reason,
+                            "correlation_id": get_correlation_id(),
+                        },
+                    )
+                    metrics.add_metric(
+                        name="AgentError", unit=MetricUnit.Count, value=1
+                    )
+                    yield ServerSentEvent(
+                        data=json.dumps({"type": "error", "error": str(reason)})
+                    )
 
     except TimeoutError:
         logger.warning(
             "Agent stream timed out",
-            extra={"timeout_seconds": MAX_AGENT_SECONDS, "correlation_id": get_correlation_id()},
+            extra={
+                "timeout_seconds": MAX_AGENT_SECONDS,
+                "correlation_id": get_correlation_id(),
+            },
         )
         metrics.add_metric(name="AgentError", unit=MetricUnit.Count, value=1)
-        yield ServerSentEvent(data=json.dumps({"type": "error", "error": "Request timed out. Please try again."}))
+        yield ServerSentEvent(
+            data=json.dumps(
+                {"type": "error", "error": "Request timed out. Please try again."}
+            )
+        )
     except Exception:
-        logger.exception("Agent stream error", extra={"correlation_id": get_correlation_id()})
+        logger.exception(
+            "Agent stream error", extra={"correlation_id": get_correlation_id()}
+        )
         metrics.add_metric(name="AgentError", unit=MetricUnit.Count, value=1)
-        yield ServerSentEvent(data=json.dumps({"type": "error", "error": "An unexpected error occurred."}))
+        yield ServerSentEvent(
+            data=json.dumps({"type": "error", "error": "An unexpected error occurred."})
+        )
     finally:
         # Flush EMF metrics manually — the chat Lambda runs under LWA+uvicorn so
         # @metrics.log_metrics never executes; the generator finally block is the
@@ -147,7 +195,9 @@ async def stream_chat(request: ChatApiRequest) -> EventSourceResponse:
         "POST /chat",
         extra={
             "message_count": len(request.messages),
-            "last_message_preview": (request.messages[-1].content[:80] if request.messages else ""),
+            "last_message_preview": (
+                request.messages[-1].content[:80] if request.messages else ""
+            ),
             "correlation_id": get_correlation_id(),
         },
     )

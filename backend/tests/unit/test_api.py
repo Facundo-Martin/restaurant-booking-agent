@@ -162,21 +162,39 @@ def test_chat_text_delta():
 
 def test_chat_tool_cycle():
     """Full tool cycle: tool-call-start then tool-result then done."""
-    mock_agent = make_mock_agent([
-        {
-            "message": {
-                "role": "assistant",
-                "content": [{"toolUse": {"toolUseId": "t-1", "name": "get_booking_details", "input": {"booking_id": "abc"}}}],
-            }
-        },
-        {
-            "message": {
-                "role": "user",
-                "content": [{"toolResult": {"toolUseId": "t-1", "status": "success", "content": [{"text": "Found it"}]}}],
-            }
-        },
-        {"data": "Your booking is confirmed."},
-    ])
+    mock_agent = make_mock_agent(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "t-1",
+                                "name": "get_booking_details",
+                                "input": {"booking_id": "abc"},
+                            }
+                        }
+                    ],
+                }
+            },
+            {
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "toolResult": {
+                                "toolUseId": "t-1",
+                                "status": "success",
+                                "content": [{"text": "Found it"}],
+                            }
+                        }
+                    ],
+                }
+            },
+            {"data": "Your booking is confirmed."},
+        ]
+    )
 
     with patch("app.api.routes.chat.Agent", mock_agent):
         with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:
@@ -192,20 +210,38 @@ def test_chat_tool_cycle():
 
 def test_chat_tool_error():
     """A tool execution failure emits tool-error, not an exception."""
-    mock_agent = make_mock_agent([
-        {
-            "message": {
-                "role": "assistant",
-                "content": [{"toolUse": {"toolUseId": "t-2", "name": "create_booking", "input": {}}}],
-            }
-        },
-        {
-            "message": {
-                "role": "user",
-                "content": [{"toolResult": {"toolUseId": "t-2", "status": "error", "content": [{"text": "DynamoDB error"}]}}],
-            }
-        },
-    ])
+    mock_agent = make_mock_agent(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "t-2",
+                                "name": "create_booking",
+                                "input": {},
+                            }
+                        }
+                    ],
+                }
+            },
+            {
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "toolResult": {
+                                "toolUseId": "t-2",
+                                "status": "error",
+                                "content": [{"text": "DynamoDB error"}],
+                            }
+                        }
+                    ],
+                }
+            },
+        ]
+    )
 
     with patch("app.api.routes.chat.Agent", mock_agent):
         with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:
@@ -265,9 +301,11 @@ def test_chat_exception_yields_error_then_done():
 
 def test_chat_force_stop_yields_error_then_done():
     """force_stop events are forwarded as error events."""
-    mock_agent = make_mock_agent([
-        {"force_stop": True, "force_stop_reason": "Token limit exceeded"},
-    ])
+    mock_agent = make_mock_agent(
+        [
+            {"force_stop": True, "force_stop_reason": "Token limit exceeded"},
+        ]
+    )
 
     with patch("app.api.routes.chat.Agent", mock_agent):
         with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:

@@ -11,7 +11,11 @@ from fastapi.routing import APIRoute
 from app.api.routes import bookings, chat
 from app.exceptions import AppException
 from app.logging import logger
-from app.middleware import CorrelationIdMiddleware, SecurityHeadersMiddleware, get_correlation_id
+from app.middleware import (
+    CorrelationIdMiddleware,
+    SecurityHeadersMiddleware,
+    get_correlation_id,
+)
 from app.models.schemas import ErrorDetail, ErrorResponse
 
 # Disable interactive docs on the live Lambda — /docs and /openapi.json are
@@ -50,7 +54,9 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
     return JSONResponse(
         status_code=exc.status_code,
         content=ErrorResponse(
-            error=ErrorDetail(code=exc.code, message=exc.message, request_id=get_correlation_id())
+            error=ErrorDetail(
+                code=exc.code, message=exc.message, request_id=get_correlation_id()
+            )
         ).model_dump(),
     )
 
@@ -62,28 +68,45 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     return JSONResponse(
         status_code=exc.status_code,
         content=ErrorResponse(
-            error=ErrorDetail(code="HTTP_ERROR", message=str(exc.detail), request_id=get_correlation_id())
+            error=ErrorDetail(
+                code="HTTP_ERROR",
+                message=str(exc.detail),
+                request_id=get_correlation_id(),
+            )
         ).model_dump(),
     )
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     return JSONResponse(
         status_code=422,
         content=ErrorResponse(
-            error=ErrorDetail(code="VALIDATION_ERROR", message="Request validation failed.", request_id=get_correlation_id())
+            error=ErrorDetail(
+                code="VALIDATION_ERROR",
+                message="Request validation failed.",
+                request_id=get_correlation_id(),
+            )
         ).model_dump(),
     )
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.exception("Unhandled exception", extra={"path": request.url.path, "method": request.method})
+    logger.exception(
+        "Unhandled exception",
+        extra={"path": request.url.path, "method": request.method},
+    )
     return JSONResponse(
         status_code=500,
         content=ErrorResponse(
-            error=ErrorDetail(code="INTERNAL_ERROR", message="An unexpected error occurred.", request_id=get_correlation_id())
+            error=ErrorDetail(
+                code="INTERNAL_ERROR",
+                message="An unexpected error occurred.",
+                request_id=get_correlation_id(),
+            )
         ).model_dump(),
     )
 
@@ -94,7 +117,9 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.api_route("/", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
+@app.api_route(
+    "/", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False
+)
 def root(request: Request) -> JSONResponse:
     """Catch-all for the API root — returns 404 with the valid endpoints listed.
 
