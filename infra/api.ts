@@ -1,6 +1,15 @@
 import { table } from "./storage";
 import { knowledgeBase } from "./ai";
 
+// Lambda Powertools env vars — shared across all functions.
+// POWERTOOLS_LOG_LEVEL is stage-aware: WARNING in production reduces log volume
+// and CloudWatch cost; INFO elsewhere gives full visibility during development.
+const powertoolsEnv = {
+  POWERTOOLS_SERVICE_NAME: "restaurant-booking",
+  POWERTOOLS_METRICS_NAMESPACE: "RestaurantBookingAgent",
+  POWERTOOLS_LOG_LEVEL: $app.stage === "production" ? "WARNING" : "INFO",
+};
+
 const api = new sst.aws.ApiGatewayV2("RestaurantApi", {
   // TODO: Restrict to the frontend domain once it's known
   cors: {
@@ -27,6 +36,7 @@ export const chatFunction = new sst.aws.Function("ChatFunction", {
   link: [table, knowledgeBase],
   layers: [lwaLayerArn],
   environment: {
+    ...powertoolsEnv,
     // LWA invoke mode — must match the Function URL's InvokeMode
     AWS_LWA_INVOKE_MODE: "response_stream",
     // Port uvicorn listens on (LWA forwards to this)
@@ -55,33 +65,22 @@ export const chatFunction = new sst.aws.Function("ChatFunction", {
   ],
 });
 
-// Bookings and health routes — simple DynamoDB reads/writes, no streaming needed
-api.route("GET /bookings/{id}", {
+// Shared config for all bookings-Lambda routes — simple DynamoDB reads/writes,
+// no streaming needed.
+const bookingsRouteConfig = {
   handler: "backend/app/handler_bookings.handler",
-  runtime: "python3.11",
-  architecture: "arm64",
-  timeout: "10 seconds",
-  memory: "256 MB",
-  link: [table],
-});
+  runtime: "python3.11" as const,
+  architecture: "arm64" as const,
+  timeout: "10 seconds" as const,
+  memory: "256 MB" as const,
+  environment: powertoolsEnv,
+};
 
-api.route("DELETE /bookings/{id}", {
-  handler: "backend/app/handler_bookings.handler",
-  runtime: "python3.11",
-  architecture: "arm64",
-  timeout: "10 seconds",
-  memory: "256 MB",
-  link: [table],
-});
+api.route("GET /bookings/{id}", { ...bookingsRouteConfig, link: [table] });
+api.route("DELETE /bookings/{id}", { ...bookingsRouteConfig, link: [table] });
 
-// Lightweight liveness check
-api.route("GET /health", {
-  handler: "backend/app/handler_bookings.handler",
-  runtime: "python3.11",
-  architecture: "arm64",
-  timeout: "10 seconds",
-  memory: "256 MB",
-});
+// Lightweight liveness check — no table link needed
+api.route("GET /health", bookingsRouteConfig);
 
 // TODO: Attach WAF once the frontend domain is known
 // TODO: Add authorizer once the user model is defined
