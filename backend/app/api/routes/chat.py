@@ -4,16 +4,14 @@ import json
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from aws_lambda_powertools import Logger
 from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 from strands import Agent
 
 from app.agent import SYSTEM_PROMPT, TOOLS, model
+from app.logging import logger
 from app.middleware import get_correlation_id
 from app.models.schemas import ChatApiRequest
-
-logger = Logger(service="restaurant-booking")
 router = APIRouter(tags=["chat"])
 
 

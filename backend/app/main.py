@@ -2,7 +2,6 @@
 
 import os
 
-from aws_lambda_powertools import Logger
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,10 +10,9 @@ from fastapi.routing import APIRoute
 
 from app.api.routes import bookings, chat
 from app.exceptions import AppException
+from app.logging import logger
 from app.middleware import CorrelationIdMiddleware, get_correlation_id
 from app.models.schemas import ErrorDetail, ErrorResponse
-
-logger = Logger(service="restaurant-booking")
 
 app = FastAPI(
     title="Restaurant Booking Agent",
