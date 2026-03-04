@@ -1,6 +1,6 @@
 # Taking the Backend Toward Production
 
-> **Status: layout draft — sections are stubs pending implementation**
+> **Status: sections 4–7 and 10 implemented. Section 8 (security) is next.**
 
 References:
 - [Preparing FastAPI for Production](https://medium.com/@ramanbazhanau/preparing-fastapi-for-production-a-comprehensive-guide-d167e693aa2b)
@@ -118,82 +118,213 @@ _This must be fixed before any other work — stale tests that pass give false c
 
 ---
 
-## 4. Fix Stale Tests
+## 4. Fix Stale Tests ✅
 
-_Rewrite `tests/unit/test_api.py` to match the actual implementation. Nothing else in this guide is safe to implement until the test baseline is correct._
+The old `test_api.py` patched `app.api.routes.chat.get_agent` (a function that did not exist) and expected a `{"response": ..., "session_id": ...}` JSON body. Tests passed only because the mock silently swallowed the missing symbol — they covered nothing real.
 
-### 4a. Chat route tests
+**What changed:** full rewrite of `tests/unit/test_api.py`.
 
-_The current chat route returns an `EventSourceResponse` (SSE stream), not a JSON body. FastAPI's `TestClient` supports SSE via the `stream=True` parameter on the request. Mock `agent.stream_async` (the function actually called in `chat.py`) to return a controlled `AsyncGenerator`. Assert on the sequence of parsed SSE events._
+The key testing pattern for SSE routes:
 
-_Cover: a successful stream (yields `text-delta` then `done`), a tool cycle (yields `tool-call-start` then `tool-result` then `done`), a Bedrock exception (yields `error` then `done`), and a `force_stop` event._
+```python
+# Mock the Agent *class* — the route calls Agent(...) to create an instance,
+# then calls instance.stream_async(message).
+def make_mock_agent(events: list[dict]) -> MagicMock:
+    async def _stream(_message: str):
+        for event in events:
+            yield event
 
-### 4b. Verify existing tests still pass
+    instance = MagicMock()
+    instance.stream_async = _stream
+    return MagicMock(return_value=instance)
 
-_`test_repositories.py` and `tests/unit/tools/test_bookings.py` are correct — they test the repository and tool functions directly and use the moto fixture properly. Confirm they pass after the chat tests are rewritten._
 
----
+def collect_sse_events(response) -> list[dict]:
+    events = []
+    for line in response.iter_lines():
+        if line.startswith("data:"):
+            payload = line[6:].strip()
+            if payload:
+                events.append(json.loads(payload))
+    return events
 
-## 5. Error Handling
 
-_The current backend exposes `str(exc)` in SSE events and relies on FastAPI's default 422 shape for validation errors. This section standardizes all error surfaces before adding new features on top._
+def test_chat_text_delta():
+    mock_agent = make_mock_agent([{"data": "Hello"}, {"data": "!"}])
 
-### 5a. A consistent error response model
+    with patch("app.api.routes.chat.Agent", mock_agent):
+        with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:
+            events = collect_sse_events(response)
 
-_Define `ErrorResponse` in `models/schemas.py`: `{"error": {"code": str, "message": str, "request_id": str}}`. Every HTTP error and every SSE `error` event uses this shape — the frontend can unconditionally parse it._
+    assert [e["type"] for e in events] == ["text-delta", "text-delta", "done"]
+```
 
-_Add `AppException(HTTPException)` as the base class for all application-level errors. It carries a `code` string alongside the HTTP status (e.g., `"BOOKING_NOT_FOUND"`, `"AGENT_TIMEOUT"`). Routes raise `AppException` — never a bare `HTTPException`._
+Tests added: `test_chat_text_delta`, `test_chat_tool_cycle`, `test_chat_tool_error`, `test_chat_exception_yields_error_then_done`, `test_chat_force_stop_yields_error_then_done`, `test_chat_missing_messages_field`, `test_chat_message_content_too_long`, `test_chat_too_many_messages`, `test_chat_done_is_always_last`.
 
-### 5b. Global exception handlers in `main.py`
-
-_Register three handlers:_
-- _`@app.exception_handler(AppException)` — maps the code and message to `ErrorResponse`, logs at `WARNING`._
-- _`@app.exception_handler(RequestValidationError)` — maps Pydantic's 422 shape to `ErrorResponse`, HTTP 422._
-- _`@app.exception_handler(Exception)` — logs the full traceback at `ERROR` with correlation ID; returns a generic `"An unexpected error occurred"` message to the client. **Never** expose `str(exc)` from an unhandled exception._
-
-### 5c. SSE error events — sanitization
-
-_Replace the `except Exception as exc: yield ServerSentEvent(... str(exc))` pattern in `chat.py`. The handler logs the full traceback and yields an `error` event containing only the correlation ID and a generic message. The ID lets the user report the failure; CloudWatch lets you find the full trace._
-
----
-
-## 6. Input Validation Hardening
-
-_Pydantic stops malformed requests. It doesn't stop expensive ones. This section adds constraints that prevent large payloads from reaching Bedrock unchecked._
-
-### 6a. Payload limits on `/chat`
-
-_Add `Field(max_length=4096)` to `ChatApiMessage.content`. Add a `model_validator` on `ChatApiRequest` that rejects more than `MAX_MESSAGES` items (e.g., 50). Both constants live in `config.py`._
-
-_Add Starlette's body size middleware to reject requests above a byte limit before they reach Pydantic — avoids wasting Lambda memory on multi-megabyte JSON bodies._
-
-### 6b. Stricter booking field constraints
-
-_`Booking.date` is a plain `str` — callers can persist `"next tuesday"` in DynamoDB. Replace with a constrained ISO 8601 pattern. `party_size` becomes `Field(ge=1, le=20)`. `special_requests` gets `Field(max_length=500)`. These constraints propagate to the OpenAPI spec and the generated TypeScript client automatically._
+**Sources:**
+- [FastAPI TestClient streaming](https://www.starlette.io/testclient/#streaming-responses)
+- [pytest-asyncio](https://pytest-asyncio.readthedocs.io/)
 
 ---
 
-## 7. Logging
+## 5. Error Handling ✅
 
-_Replace the standard `logging.getLogger()` calls with Lambda Powertools Logger and add per-request correlation IDs. This is the foundation that makes everything in section 9 (observability) meaningful._
+**Problem:** the original backend exposed `str(exc)` in SSE error events and returned FastAPI's raw Pydantic 422 shape — inconsistent across surfaces and leaking internal exception messages to clients.
 
-### 7a. Replacing `logging.getLogger` with Powertools Logger
+**What changed:**
 
-_Add `aws-lambda-powertools` to `pyproject.toml`. Initialize `Logger(service="restaurant-booking")` at module level in each file that currently calls `logging.getLogger()`. The Logger emits JSON natively and auto-injects `cold_start`, `function_name`, `function_version`, and `xray_trace_id` on every record._
+`app/exceptions.py` — machine-readable error codes alongside HTTP status:
 
-_Apply `@logger.inject_lambda_context` to the Mangum handlers (`handler_bookings.handler`). For the LWA-based chat handler, show the equivalent approach (Powertools middleware or manual context injection)._
+```python
+class AppException(HTTPException):
+    def __init__(self, status_code: int, code: str, message: str) -> None:
+        super().__init__(status_code=status_code, detail=message)
+        self.code = code
+        self.message = message
 
-_Local dev: when `AWS_LAMBDA_FUNCTION_NAME` is not set, Powertools still emits JSON — just without the Lambda-specific fields._
+# Usage in routes:
+raise AppException(status_code=404, code="BOOKING_NOT_FOUND", message=f"Booking {booking_id} not found.")
+```
 
-### 7b. Request correlation IDs
+`app/models/schemas.py` — universal error envelope:
 
-_A single `/chat` call triggers log statements across `chat.py`, `tools/bookings.py`, and `repositories/bookings.py` — but CloudWatch shows them as unrelated lines. The fix: generate a UUID per request and thread it through every log record for that request._
+```python
+class ErrorDetail(BaseModel):
+    code: str
+    message: str
+    request_id: str | None = None  # correlation ID, populated by middleware
 
-_Implement `CorrelationIdMiddleware` using Starlette's `BaseHTTPMiddleware`. Store the ID in a `contextvars.ContextVar` — not a module-level global — so it's safe across concurrent async calls and doesn't bleed between Lambda invocations that reuse the same execution environment. Inject the ID into Powertools Logger via `logger.append_keys(correlation_id=...)`. Return it to the client as `X-Request-ID`._
+class ErrorResponse(BaseModel):
+    error: ErrorDetail
+```
 
-### 7c. Structured log events at agent lifecycle points
+`app/main.py` — four global handlers covering every error surface:
 
-_The current codebase logs one line per request. A 12-second Bedrock call that invokes two tools should leave structured evidence at each step. Add `logger.info(...)` calls for: tool-call-start (tool name, input), tool-result (status, tool name). The `force_stop` warning already exists. Each call carries the correlation ID automatically via the `ContextVar`._
+```python
+@app.exception_handler(AppException)
+async def app_exception_handler(request, exc):
+    return JSONResponse(status_code=exc.status_code,
+        content=ErrorResponse(error=ErrorDetail(
+            code=exc.code, message=exc.message, request_id=get_correlation_id()
+        )).model_dump())
+
+@app.exception_handler(HTTPException)          # FastAPI internals (405, etc.)
+@app.exception_handler(RequestValidationError) # Pydantic 422
+@app.exception_handler(Exception)             # catch-all — never leaks str(exc)
+```
+
+SSE error events in `chat.py` sanitized to a generic message:
+
+```python
+except Exception:
+    logger.exception("Agent stream error", extra={"correlation_id": get_correlation_id()})
+    yield ServerSentEvent(data=json.dumps({"type": "error", "error": "An unexpected error occurred."}))
+```
+
+**Sources:**
+- [FastAPI exception handlers](https://fastapi.tiangolo.com/tutorial/handling-errors/)
+- [Starlette RequestValidationError](https://www.starlette.io/exceptions/)
+
+---
+
+## 6. Input Validation Hardening ✅
+
+**Problem:** Pydantic stopped malformed requests but not expensive ones. A caller could send 200 messages with 100k characters each — all of it reaching Bedrock unchecked.
+
+**What changed:**
+
+Constants centralised in `app/config.py` so limits are tunable in one place:
+
+```python
+CHAT_MAX_MESSAGE_LENGTH: int = 4096   # characters per individual message
+CHAT_MAX_MESSAGES: int = 50           # messages per /chat request
+BOOKING_MAX_SPECIAL_REQUESTS_LENGTH: int = 500
+```
+
+`app/models/schemas.py` — constraints on all input fields:
+
+```python
+class ChatApiMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=CHAT_MAX_MESSAGE_LENGTH)
+
+class ChatApiRequest(BaseModel):
+    messages: list[ChatApiMessage] = Field(max_length=CHAT_MAX_MESSAGES)
+
+class Booking(BaseModel):
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")   # ISO 8601 — rejects "next tuesday"
+    party_size: int = Field(ge=1, le=20)
+    special_requests: str | None = Field(default=None, max_length=BOOKING_MAX_SPECIAL_REQUESTS_LENGTH)
+```
+
+Pydantic raises `RequestValidationError` on violation → the global handler returns HTTP 422 with the standard `ErrorResponse` envelope. Constraints also propagate to the OpenAPI spec and the generated TypeScript client automatically.
+
+**Sources:**
+- [Pydantic Field constraints](https://docs.pydantic.dev/latest/concepts/fields/)
+- [FastAPI request validation](https://fastapi.tiangolo.com/tutorial/body-fields/)
+
+---
+
+## 7. Logging ✅
+
+**Problem:** `logging.getLogger()` emitted plain-text lines with no JSON structure, no Lambda context, and no way to correlate log lines from the same request in CloudWatch.
+
+### 7a. Lambda Powertools Logger
+
+`app/logging.py` — single shared instance (prevents divergent service names):
+
+```python
+from aws_lambda_powertools import Logger
+logger = Logger(service="restaurant-booking")
+```
+
+All modules import from here: `from app.logging import logger`. Emits structured JSON automatically, with `cold_start`, `function_name`, `function_version`, and `xray_trace_id` injected on every line when running in Lambda.
+
+`handler_bookings.py` — `inject_lambda_context` enriches all log lines from that invocation with the Lambda request ID:
+
+```python
+@logger.inject_lambda_context(log_event=False, clear_state=True)
+@tracer.capture_lambda_handler
+@metrics.log_metrics(capture_cold_start_metric=True)
+def handler(event: LambdaEvent, context: LambdaContext) -> dict:
+    return _mangum_handler(event, context)
+```
+
+`log_event=False` — the raw API Gateway event contains headers and body; logging it would expose sensitive data. `clear_state=True` — prevents `append_keys()` values from leaking across warm invocations.
+
+`inject_lambda_context` only applies to `handler_bookings` — the chat Lambda runs under LWA+uvicorn where the Python handler is bypassed entirely.
+
+### 7b. Correlation ID middleware
+
+`app/middleware.py` — `ContextVar` is the right primitive here (not a module-level global) because it is async-safe and resets automatically when the async context ends, preventing bleed between concurrent requests:
+
+```python
+_correlation_id: ContextVar[str] = ContextVar("correlation_id", default="")
+
+def get_correlation_id() -> str:
+    return _correlation_id.get()
+
+class CorrelationIdMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        cid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        _correlation_id.set(cid)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = cid  # echoed back so clients can log it
+        return response
+```
+
+Registered as the outermost middleware in `main.py` (before CORS), so it runs on every request including health checks:
+
+```python
+app.add_middleware(CorrelationIdMiddleware)
+```
+
+Every log call and every `ErrorDetail` response now carries `request_id=get_correlation_id()`, making it possible to filter a complete request trace with a single CloudWatch Logs Insights query.
+
+**Sources:**
+- [AWS Lambda Powertools Logger](https://docs.aws.amazon.com/powertools/python/latest/core/logger/)
+- [Python contextvars](https://docs.python.org/3/library/contextvars.html)
+- [Starlette BaseHTTPMiddleware](https://www.starlette.io/middleware/)
 
 ---
 
@@ -233,23 +364,92 @@ _`BedrockModel` delegates to boto3, which applies `standard` retry mode with exp
 
 ---
 
-## 10. Observability
-
-_CloudWatch + X-Ray via Lambda Powertools Tracer and Metrics. Zero additional infrastructure._
+## 10. Observability ✅
 
 ### 10a. Powertools Tracer (X-Ray)
 
-_Enable active tracing on both Lambda functions in `infra/api.ts` (`tracing: "active"`). Initialize `Tracer(service="restaurant-booking")` at module level in relevant files. Add `@tracer.capture_method` to repository functions and the `@tool` functions in `tools/bookings.py`. The Tracer patches boto3 automatically — every DynamoDB and Bedrock call becomes an X-Ray sub-segment._
+`app/tracer.py` — shared singleton; auto-disables outside Lambda (no mocking required in tests):
 
-_Note: the chat function uses LWA + Function URL. Active tracing on the SST function config covers the Lambda invocation; boto3 patch covers DynamoDB and Bedrock sub-segments within it._
+```python
+from aws_lambda_powertools import Tracer
+tracer = Tracer()  # reads POWERTOOLS_SERVICE_NAME from env
+```
 
-_Show the resulting X-Ray service map: Lambda → DynamoDB for bookings, Lambda → Bedrock Runtime for chat. Show how to read the trace waterfall to identify slow tool calls._
+`handler_bookings.py` — `@tracer.capture_lambda_handler` creates an X-Ray subsegment for the full invocation (see Section 7a for the full decorator stack).
 
-### 10b. Powertools Metrics
+`tools/bookings.py` — `@tracer.capture_method` wraps each tool function, creating subsegments for every DynamoDB call regardless of which Lambda invokes them:
 
-_Define two CloudWatch custom metrics: `ChatRequests` (count per invocation) and `AgentErrors` (count, incremented when the SSE `error` event fires). Metrics are flushed automatically when the Lambda handler exits._
+```python
+@tool
+@tracer.capture_method
+def get_booking_details(booking_id: str, restaurant_name: str) -> dict: ...
 
-_Show a CloudWatch Logs Insights query that plots error rate over time. This is the first operational alert surface the service has._
+@tool
+@tracer.capture_method
+def create_booking(...) -> dict: ...
+
+@tool
+@tracer.capture_method
+def delete_booking(booking_id: str, restaurant_name: str) -> str: ...
+```
+
+The Tracer patches boto3 automatically — every DynamoDB and Bedrock SDK call becomes a named X-Ray subsegment with latency and error metadata.
+
+**LWA note:** `@tracer.capture_lambda_handler` only applies to `handler_bookings`. The chat Lambda runs under LWA+uvicorn — the Lambda runtime still creates a root X-Ray segment, and `@tracer.capture_method` on the tool functions creates subsegments within it. Powertools decorator on the handler itself is not reachable.
+
+**X-Ray SDK maintenance mode (Feb 2026):** maintenance mode means no new features, but security and critical fixes continue. Powertools has OpenTelemetry/ADOT support on their p0 roadmap but has not shipped it yet. The current X-Ray surface area we use (`capture_lambda_handler`, `capture_method`) is stable. Revisit when Powertools ships their OTEL provider.
+
+### 10b. Powertools Metrics (CloudWatch EMF)
+
+`app/metrics.py` — shared singleton using Embedded Metric Format (emits via CloudWatch Logs — no `PutMetricData` API calls, no extra IAM permissions):
+
+```python
+from aws_lambda_powertools import Metrics
+from aws_lambda_powertools.metrics import MetricUnit
+
+metrics = Metrics(namespace="RestaurantBookingAgent")
+```
+
+**Bookings Lambda** — `@metrics.log_metrics(capture_cold_start_metric=True)` flushes the EMF blob at handler exit and emits a separate `ColdStart` metric automatically (see Section 7a).
+
+**Chat Lambda** — `@metrics.log_metrics` never executes (LWA bypasses the handler). Manual flush in the generator's `finally` block is the only reliable flush point:
+
+```python
+# chat.py — stream_chat
+metrics.add_metric(name="ChatRequest", unit=MetricUnit.Count, value=1)
+
+# chat.py — generate_chat_events
+if event.get("force_stop"):
+    metrics.add_metric(name="AgentError", unit=MetricUnit.Count, value=1)
+
+except Exception:
+    metrics.add_metric(name="AgentError", unit=MetricUnit.Count, value=1)
+
+finally:
+    metrics.flush_metrics()  # manual flush — required for LWA path
+    yield ServerSentEvent(data=json.dumps({"type": "done"}))
+```
+
+`tools/bookings.py` — business-level metric emitted on every successful booking:
+
+```python
+metrics.add_metric(name="BookingCreated", unit=MetricUnit.Count, value=1)
+```
+
+Metric summary:
+
+| Metric | Source | When emitted |
+|--------|--------|--------------|
+| `ColdStart` | handler_bookings | First invocation of a new execution environment |
+| `ChatRequest` | chat.py | Every POST /chat |
+| `AgentError` | chat.py | force_stop or unhandled stream exception |
+| `BookingCreated` | tools/bookings.py | Successful `create_booking` tool call |
+
+**Sources:**
+- [AWS Lambda Powertools Tracer](https://docs.aws.amazon.com/powertools/python/latest/core/tracer/)
+- [AWS Lambda Powertools Metrics](https://docs.aws.amazon.com/powertools/python/latest/core/metrics/)
+- [CloudWatch Embedded Metric Format](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Embedded_Metric_Format.html)
+- [aws-xray-sdk-python maintenance mode](https://github.com/aws/aws-xray-sdk-python)
 
 ---
 
