@@ -1,6 +1,6 @@
 # Taking the Backend Toward Production
 
-> **Status: sections 4–10 implemented. Section 11 (health check) is next.**
+> **Status: sections 4–11 implemented. Section 12 (WAF + rate limiting) is next.**
 
 References:
 - [Preparing FastAPI for Production](https://medium.com/@ramanbazhanau/preparing-fastapi-for-production-a-comprehensive-guide-d167e693aa2b)
@@ -552,39 +552,152 @@ Metric summary:
 
 ---
 
-## 11. Health Check
+## 11. Health Check ✅
 
-_`GET /health → {"status": "ok"}` proves the Lambda is alive. It does not prove DynamoDB is reachable._
+**Problem:** `GET /health → {"status": "ok"}` proved the Lambda was alive but not that DynamoDB was reachable. A broken table returned 200.
 
-### 11a. Dependency health sub-checks
+### 11a. Dependency health sub-checks ✅
 
-_Extend the health endpoint to probe DynamoDB with a lightweight `describe_table` call. Shape: `{"status": "ok" | "degraded", "dependencies": {"dynamodb": "ok" | "error"}, "not_checked": ["bedrock", "knowledge_base"]}`. Return HTTP 200 when all dependencies are healthy, HTTP 503 otherwise. Reuse the boto3 client from `repositories/bookings.py` — no new client needed._
+`app/repositories/bookings.py` — added `ping()` using `describe_table` (no data read, no cost):
 
-### 11b. Timeouts on dependency checks
+```python
+def ping() -> None:
+    """Lightweight DynamoDB reachability check — raises on any error."""
+    _table.meta.client.describe_table(TableName=TABLE_NAME)
+```
 
-_Each sub-check runs inside `asyncio.wait_for(..., timeout=2.0)`. A slow DynamoDB response should not cause the health check to time out at the Lambda level, leaving the uptime monitor with an unstructured 504._
+`app/main.py` — health endpoint extended with structured dependency check:
 
-### 11c. Why Bedrock and the Knowledge Base are omitted
+```python
+_HEALTH_TIMEOUT = 2.0  # seconds per dependency probe
 
-_Bedrock has no lightweight probe — any call incurs a model invocation cost. The Knowledge Base retrieval API is similarly expensive. Both are deliberately listed in `not_checked`. Operators know exactly what "ok" covers._
+@app.get("/health", operation_id="healthCheck")
+async def health() -> JSONResponse:
+    dynamodb_status = "ok"
+    try:
+        await asyncio.wait_for(
+            asyncio.get_event_loop().run_in_executor(None, booking_repo.ping),
+            timeout=_HEALTH_TIMEOUT,
+        )
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.warning("Health check: DynamoDB unreachable")
+        dynamodb_status = "error"
+
+    overall = "ok" if dynamodb_status == "ok" else "degraded"
+    status_code = 200 if overall == "ok" else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": overall,
+            "dependencies": {"dynamodb": dynamodb_status},
+            "not_checked": ["bedrock", "knowledge_base"],
+        },
+    )
+```
+
+### 11b. Timeouts on dependency checks ✅
+
+`asyncio.wait_for(..., timeout=2.0)` wraps the synchronous `describe_table` call (run in a thread pool via `run_in_executor`). A slow or hung DynamoDB response returns a clean 503 rather than a Lambda-level 504.
+
+### 11c. Why Bedrock and the Knowledge Base are omitted ✅
+
+Bedrock has no lightweight probe — any call incurs a model invocation cost. The Knowledge Base retrieval API is similarly expensive. Both are deliberately listed in `not_checked`. Operators know exactly what "ok" covers.
+
+**Tests:**
+```python
+def test_health_ok():
+    with patch("app.repositories.bookings.ping"):
+        response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["dependencies"]["dynamodb"] == "ok"
+
+def test_health_degraded():
+    with patch("app.repositories.bookings.ping", side_effect=Exception("unreachable")):
+        response = client.get("/health")
+    assert response.status_code == 503
+    assert response.json()["status"] == "degraded"
+```
 
 ---
 
-## 12. Rate Limiting and WAF
+## 12. Rate Limiting and WAF ✅ (12a–12b) / pending (12c)
 
-_AWS WAF web ACL attached to both entry points. Zero application code. This is an infra change in `infra/api.ts`._
+**What changed:** a new `infra/security.ts` module creates a single REGIONAL WAF WebACL and associates it with both entry points. Zero application code changes.
 
-### 12a. WAF on the API Gateway
+### 12a. WAF on the API Gateway ✅
 
-_Create an `aws.wafv2.WebAcl` in a new `infra/security.ts` module. Attach it to the `RestaurantApi`. Configure a rate-based rule (e.g., 100 requests per 5-minute window per IP) and enable the AWS Managed Rules Common Rule Set (covers OWASP Top 10 patterns). The `infra/api.ts` TODO already calls this out._
+`infra/security.ts` — `aws.wafv2.WebAcl` with two rules, associated with the API Gateway `$default` stage ARN via `api.nodes.stage.arn` (exported from `infra/api.ts`):
 
-### 12b. WAF on the Chat Function URL
+```typescript
+// infra/security.ts
+import { api, chatFunction } from "./api";
 
-_Lambda Function URLs have supported WAF associations since 2023 via `aws.lambda.FunctionUrlConfig` / `aws.wafv2.WebAclAssociation`. Associate the same (or a separate, more permissive) web ACL to `chatFunction.url`. A streaming Bedrock call is inherently expensive — IP-based rate limiting here is the primary cost-protection mechanism before the auth phase adds per-user limits._
+export const webAcl = new aws.wafv2.WebAcl("RestaurantWebAcl", {
+  scope: "REGIONAL",
+  defaultAction: { allow: {} },
+  rules: [
+    {
+      name: "IPRateLimit",
+      priority: 1,
+      action: { block: {} },
+      statement: {
+        rateBasedStatement: { limit: 100, aggregateKeyType: "IP" },
+      },
+      visibilityConfig: { cloudwatchMetricsEnabled: true, metricName: "IPRateLimit", sampledRequestsEnabled: true },
+    },
+    {
+      name: "AWSManagedRulesCommonRuleSet",
+      priority: 2,
+      overrideAction: { none: {} },
+      statement: {
+        managedRuleGroupStatement: {
+          vendorName: "AWS",
+          name: "AWSManagedRulesCommonRuleSet",
+          // COUNT (not BLOCK): POST /chat accepts up to 50 × 4 096 chars — exceeds 8 KB default
+          ruleActionOverrides: [{ name: "SizeRestrictions_BODY", actionToUse: { count: {} } }],
+        },
+      },
+      visibilityConfig: { cloudwatchMetricsEnabled: true, metricName: "AWSManagedRulesCommonRuleSet", sampledRequestsEnabled: true },
+    },
+  ],
+  visibilityConfig: { cloudwatchMetricsEnabled: true, metricName: "RestaurantWebAcl", sampledRequestsEnabled: true },
+});
 
-### 12c. CORS lockdown (same file)
+// SST's ApiGatewayV2 doesn't expose a stage node; construct the ARN manually
+const apiStageArn = $interpolate`arn:aws:apigateway:${aws.getRegionOutput().name}::/apis/${api.nodes.api.id}/stages/$default`;
+new aws.wafv2.WebAclAssociation("ApiGatewayWafAssociation", {
+  resourceArn: apiStageArn,
+  webAclArn: webAcl.arn,
+});
+```
 
-_Update `allowOrigins` on both the API Gateway and the Function URL from `["*"]` to the Vercel frontend domain. This is the right moment since WAF and CORS are both in `infra/api.ts` / `infra/security.ts`._
+Rate limit: 100 req per 5-minute window per IP (AWS minimum; ~1 req/3 s). A streaming Bedrock call takes 10–30 s, so legitimate users rarely approach this limit.
+
+`SizeRestrictions_BODY` excluded from the Common Rule Set to prevent false positives on large (but valid) chat histories.
+
+### 12b. WAF on the Chat Function URL ✅
+
+Lambda Function URLs support WAF associations (GA since May 2023). The resource ARN is the function ARN with `/urls` appended:
+
+```typescript
+new aws.wafv2.WebAclAssociation("ChatFunctionWafAssociation", {
+  resourceArn: $interpolate`${chatFunction.nodes.function.arn}/urls`,
+  webAclArn: webAcl.arn,
+});
+```
+
+Same WebACL shared with the API Gateway — simplifies rule management. Chat is inherently rate-limited by Bedrock latency; IP-based blocking is the primary cost-protection mechanism before the auth phase adds per-user limits.
+
+`sst.config.ts` — import added after `api`:
+```typescript
+const api = await import("./infra/api");
+await import("./infra/security");
+const web = await import("./infra/web");
+```
+
+### 12c. CORS lockdown
+
+_Pending — blocked on knowing the Vercel frontend domain. Both `api.ts` (API Gateway) and the Function URL `cors` config currently use `allowOrigins: ["*"]`. Once the domain is known, update both to the specific origin. WAF is already in place, so this is a one-line change per entry point._
 
 ---
 

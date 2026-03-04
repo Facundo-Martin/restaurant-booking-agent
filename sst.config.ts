@@ -21,6 +21,7 @@ export default $config({
     const { rds } = await import("./infra/storage");
     const ai = await import("./infra/ai");
     const api = await import("./infra/api");
+    await import("./infra/security");
     const web = await import("./infra/web");
 
     return {

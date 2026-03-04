@@ -10,7 +10,7 @@ const powertoolsEnv = {
   POWERTOOLS_LOG_LEVEL: $app.stage === "production" ? "WARNING" : "INFO",
 };
 
-const api = new sst.aws.ApiGatewayV2("RestaurantApi", {
+export const api = new sst.aws.ApiGatewayV2("RestaurantApi", {
   // TODO: Restrict to the frontend domain once it's known
   cors: {
     allowOrigins: ["*"],
