@@ -69,6 +69,29 @@ def test_health():
 
 
 # ---------------------------------------------------------------------------
+# Security headers
+# ---------------------------------------------------------------------------
+
+
+def test_security_headers_present():
+    """Every response must carry the standard security headers."""
+    response = client.get("/health")
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["x-xss-protection"] == "1; mode=block"
+
+
+def test_correlation_id_returned():
+    """X-Request-ID echoed in response when provided; generated when absent."""
+    response = client.get("/health", headers={"X-Request-ID": "test-id-123"})
+    assert response.headers["x-request-id"] == "test-id-123"
+
+    response = client.get("/health")
+    assert "x-request-id" in response.headers
+
+
+# ---------------------------------------------------------------------------
 # GET /bookings/{booking_id}
 # ---------------------------------------------------------------------------
 

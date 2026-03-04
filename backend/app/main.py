@@ -11,17 +11,26 @@ from fastapi.routing import APIRoute
 from app.api.routes import bookings, chat
 from app.exceptions import AppException
 from app.logging import logger
-from app.middleware import CorrelationIdMiddleware, get_correlation_id
+from app.middleware import CorrelationIdMiddleware, SecurityHeadersMiddleware, get_correlation_id
 from app.models.schemas import ErrorDetail, ErrorResponse
+
+# Disable interactive docs on the live Lambda — /docs and /openapi.json are
+# accessible to anyone with the Function URL and serve no purpose in production.
+# The TypeScript client is regenerated from a local dev server instead.
+_in_lambda = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
 
 app = FastAPI(
     title="Restaurant Booking Agent",
     description="FastAPI + Strands Agents backend for the restaurant booking assistant",
     version="0.1.0",
+    docs_url=None if _in_lambda else "/docs",
+    redoc_url=None if _in_lambda else "/redoc",
+    openapi_url=None if _in_lambda else "/openapi.json",
 )
 
-# CORS — only needed in local dev. In production, Lambda Function URL config
-# and API Gateway handle CORS before the request reaches FastAPI.
+app.add_middleware(SecurityHeadersMiddleware)
+# CorrelationIdMiddleware must be inside SecurityHeadersMiddleware so the
+# X-Request-ID header it adds is also covered by the security header pass.
 app.add_middleware(CorrelationIdMiddleware)
 
 if not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
