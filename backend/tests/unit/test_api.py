@@ -216,6 +216,27 @@ def test_chat_tool_error():
     assert events[1]["error"] == "DynamoDB error"
 
 
+def test_chat_timeout_yields_error_then_done():
+    """asyncio.TimeoutError yields a user-friendly timeout error, then done."""
+
+    async def _timeout_stream(_message: str):
+        raise TimeoutError()
+        yield  # makes this an async generator
+
+    instance = MagicMock()
+    instance.stream_async = _timeout_stream
+    mock_agent = MagicMock(return_value=instance)
+
+    with patch("app.api.routes.chat.Agent", mock_agent):
+        with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:
+            assert response.status_code == 200
+            events = collect_sse_events(response)
+
+    types = [e["type"] for e in events]
+    assert types == ["error", "done"]
+    assert "timed out" in events[0]["error"].lower()
+
+
 def test_chat_exception_yields_error_then_done():
     """An unhandled exception in the stream yields error + done — never a bare 500.
 

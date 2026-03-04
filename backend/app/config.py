@@ -13,6 +13,13 @@ CHAT_MAX_MESSAGE_LENGTH: int = 4096  # characters per individual message
 CHAT_MAX_MESSAGES: int = 50          # messages per /chat request
 BOOKING_MAX_SPECIAL_REQUESTS_LENGTH: int = 500
 
+# Agent stream timeout — hard upper bound on how long a single chat turn can run.
+# Set below the 120s Lambda timeout to guarantee the SSE done event is emitted
+# before Lambda kills the execution environment mid-stream.
+# Retries multiply wait time (boto3 standard mode: up to 3 × Bedrock latency),
+# so a timeout is necessary even with retries in place.
+MAX_AGENT_SECONDS: int = 110
+
 # Bedrock Guardrail — optional. When set, the guardrail is evaluated on every
 # model invocation before the response reaches the agent. Leave unset in dev/test;
 # set via SST link once a guardrail is deployed (see infra/ai.ts).
