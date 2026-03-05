@@ -12,6 +12,7 @@ from strands.agent.conversation_manager import SlidingWindowConversationManager
 
 from app.agent import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
 from app.config import MAX_AGENT_SECONDS
+from app.hooks import CorrelationIdHook, LimitToolCallsHook, TokenMetricsHook
 from app.logging import logger
 from app.metrics import MetricUnit, metrics
 from app.middleware import get_correlation_id
@@ -49,6 +50,12 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
         per_turn=True,  # Apply management before each model cal, not just at agent loop
     )
 
+    hooks = [
+        CorrelationIdHook(),
+        TokenMetricsHook(),
+        LimitToolCallsHook({"retrieve": 10, "create_booking": 3, "delete_booking": 2}),
+    ]
+
     agent = Agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
@@ -56,6 +63,7 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
         callback_handler=None,
         conversation_manager=conversation_manager,
         retry_strategy=RETRY_STRATEGY,
+        hooks=hooks,
     )
     # Maps toolUseId → toolName so tool-result events can include the name.
     tool_names: dict[str, str] = {}
