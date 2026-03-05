@@ -1,6 +1,6 @@
 # Taking the Backend Toward Production
 
-> **Status: sections 4–11 implemented. Section 12 (WAF + rate limiting) is next.**
+> **Status: sections 4–12 and 14 implemented. Section 15 (CI/CD pipeline) is next.**
 
 References:
 - [Preparing FastAPI for Production](https://medium.com/@ramanbazhanau/preparing-fastapi-for-production-a-comprehensive-guide-d167e693aa2b)
@@ -723,23 +723,91 @@ _Once auth is live, `Booking.user_id` is no longer caller-supplied. Extract it f
 
 ---
 
-## 14. Testing
+## 14. Testing ✅
 
-_Fix the stale tests first (section 4), then add integration tests._
+### 14a. Integration test strategy ✅
 
-### 14a. Integration test strategy
+Two marker levels in `pyproject.toml`:
 
-_Two levels: (1) moto-mocked DynamoDB — already in place, fast; (2) real DynamoDB in a `test` SST stage — proves the repository layer works end-to-end. The `test` stage is cheap: no OSS, no Knowledge Base, just Lambda + DynamoDB._
+```toml
+markers = [
+    "integration: requires a deployed AWS test stage — INTEGRATION_TABLE_NAME / INTEGRATION_API_URL / INTEGRATION_CHAT_URL",
+    "agent: requires real Bedrock credentials — run manually or nightly",
+]
+```
 
-_Mark integration tests with `@pytest.mark.integration` to exclude them from the default `pytest` run._
+`tests/integration/conftest.py` — fixtures skip gracefully when env vars are absent:
 
-### 14b. Testing the SSE stream end-to-end
+```python
+@pytest.fixture(scope="module")
+def real_table():
+    table_name = os.environ.get("INTEGRATION_TABLE_NAME")
+    if not table_name:
+        pytest.skip("INTEGRATION_TABLE_NAME not set")
+    dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+    real = dynamodb.Table(table_name)
+    original = _repo_module._table
+    _repo_module._table = real   # same swap pattern as moto unit fixture
+    yield real
+    _repo_module._table = original
+```
 
-_`httpx`'s async client can consume SSE streams. In unit tests, mock `agent.stream_async` to return a controlled `AsyncGenerator` and assert on the SSE event sequence. In integration tests against the `test` stage, hit the real endpoint with a simple question and assert the stream terminates with `done`._
+`tests/integration/test_repositories.py` — real DynamoDB CRUD. Each test creates a unique item and deletes it in `finally` so it is safe to run repeatedly against a shared test-stage table. Tests: `create_get_roundtrip`, `create_with_special_requests`, `get_nonexistent_returns_none`, `delete_existing`, `delete_nonexistent_returns_false`, `delete_is_idempotent`.
 
-### 14c. Prompt regression testing
+Run:
+```bash
+INTEGRATION_TABLE_NAME=<name> uv run pytest tests/integration/test_repositories.py -v
+```
 
-_The agent's behaviour is defined by the system prompt and tool docstrings. A model version bump or prompt edit can silently change it. Write a small set of fixed dialogues that assert on the SSE event sequence (e.g., `tool-call-start` with `toolName == "create_booking"` must not appear before a confirmation exchange). Run these against `agent.stream_async` directly — no HTTP layer involved. Mark `@pytest.mark.agent` and run them manually or in a nightly CI job, not on every push._
+### 14b. Testing the SSE stream end-to-end ✅
+
+`tests/integration/test_api.py` — HTTP smoke tests against the real deployed test stage:
+
+```python
+def test_chat_stream_terminates_with_done(chat_url):
+    payload = {"messages": [{"role": "user", "content": "Hi"}]}
+    last_type = None
+    with httpx.Client(timeout=60.0) as client:
+        with client.stream("POST", f"{chat_url}/chat", json=payload) as response:
+            assert response.status_code == 200
+            for line in response.iter_lines():
+                if line.startswith("data:"):
+                    raw = line[6:].strip()
+                    if raw:
+                        last_type = json.loads(raw).get("type")
+    assert last_type == "done"
+```
+
+Also covers: health shape + security headers, oversized/missing messages → 422.
+
+Run:
+```bash
+INTEGRATION_API_URL=https://... INTEGRATION_CHAT_URL=https://... \
+  uv run pytest tests/integration/test_api.py -v
+```
+
+### 14c. Prompt regression testing ✅
+
+`tests/integration/test_agent.py` — calls `agent.stream_async()` with real Bedrock. Tools are patched to return canned data (no real DynamoDB/KB needed); we test the LLM's routing decisions, not tool execution.
+
+```python
+async def test_restaurant_query_calls_retrieve():
+    agent = Agent(model=model, tools=TOOLS, system_prompt=SYSTEM_PROMPT)
+    mock_retrieve = MagicMock(return_value=_FAKE_RESTAURANTS)
+    with patch("strands_tools.retrieve", mock_retrieve):
+        events = [e async for e in agent.stream_async("What restaurants do you have?")]
+    assert "retrieve" in _tool_names(events)
+
+async def test_create_booking_not_called_without_confirmation():
+    agent = Agent(model=model, tools=TOOLS, system_prompt=SYSTEM_PROMPT)
+    events = [e async for e in agent.stream_async("Book a table for me tonight")]
+    assert "create_booking" not in _tool_names(events)
+```
+
+Run manually or nightly — not on every push:
+```bash
+uv run pytest tests/integration/test_agent.py -v
+```
 
 ---
 
