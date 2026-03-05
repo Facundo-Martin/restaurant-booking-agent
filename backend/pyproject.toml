@@ -54,3 +54,7 @@ max-line-length = 88  # match ruff
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: requires a deployed AWS test stage — set INTEGRATION_TABLE_NAME / INTEGRATION_API_URL / INTEGRATION_CHAT_URL",
+    "agent: requires real Bedrock credentials — run manually or nightly, not on every push",
+]
