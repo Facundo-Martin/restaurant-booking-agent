@@ -10,7 +10,7 @@ from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 from strands import Agent
 from strands.agent.conversation_manager import SlidingWindowConversationManager
 
-from app.agent import SYSTEM_PROMPT, TOOLS, model
+from app.agent import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
 from app.config import MAX_AGENT_SECONDS
 from app.logging import logger
 from app.metrics import MetricUnit, metrics
@@ -55,6 +55,7 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
         tools=TOOLS,
         callback_handler=None,
         conversation_manager=conversation_manager,
+        retry_strategy=RETRY_STRATEGY,
     )
     # Maps toolUseId → toolName so tool-result events can include the name.
     tool_names: dict[str, str] = {}

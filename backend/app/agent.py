@@ -7,6 +7,7 @@ chat.py to prevent conversation history from leaking between users.
 
 import os
 
+from strands import ModelRetryStrategy
 from strands.models import BedrockModel
 from strands_tools import current_time, retrieve
 
@@ -36,6 +37,16 @@ the knowledge base. Use current_time when date context is needed.
 # upper bound is asyncio.timeout(MAX_AGENT_SECONDS) in chat.py.
 os.environ.setdefault("AWS_RETRY_MODE", "standard")
 os.environ.setdefault("AWS_MAX_ATTEMPTS", "3")
+
+# Strands-level retry for ModelThrottledException (rate limits).
+# Default is 6 total attempts with 4s initial delay — worst case 124s, which
+# exceeds the 110s asyncio.timeout in chat.py and prevents the clean SSE done event.
+# Aligned with AWS_MAX_ATTEMPTS=3; worst-case wait: 2+4+20 = 26s.
+RETRY_STRATEGY = ModelRetryStrategy(
+    max_attempts=3,  # 1 initial + 2 retries — matches AWS_MAX_ATTEMPTS
+    initial_delay=2,
+    max_delay=20,  # caps exponential growth well within the 110s timeout budget
+)
 
 # Cached at module level — BedrockModel is stateless (no conversation state).
 # Creating it once per cold start avoids repeated credential resolution overhead.
