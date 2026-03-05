@@ -20,17 +20,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
+          version: "0.10.8"
           enable-cache: true
-          cache-dependency-glob: backend/pyproject.toml
+          # Key cache on the lock file — more precise than pyproject.toml
+          cache-dependency-glob: backend/uv.lock
 
       - name: Install dev dependencies
         run: uv sync --frozen --group dev
         working-directory: backend
 
       - name: ruff check
-        run: uv run ruff check .
+        # --output-format=github emits ::error file=...:: annotations so
+        # violations appear as inline comments on the PR diff, not just in logs
+        run: uv run ruff check --output-format=github .
         working-directory: backend
 
       - name: ruff format check
@@ -51,10 +55,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
+          version: "0.10.8"
           enable-cache: true
-          cache-dependency-glob: backend/pyproject.toml
+          cache-dependency-glob: backend/uv.lock
 
       - name: Install dev dependencies
         run: uv sync --frozen --group dev

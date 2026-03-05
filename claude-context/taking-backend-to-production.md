@@ -902,7 +902,12 @@ prek install   # wires .git/hooks/pre-commit
 
 ### 15b. Lint and unit tests ✅
 
-`ci.yml` — `lint` job runs `ruff check`, `ruff format --check`, and `pylint app/` from `working-directory: backend`. `unit-tests` job runs `pytest tests/unit/ -q`. Both cache the uv venv keyed on `backend/pyproject.toml`. Pipeline stops on failure — no deployment.
+`ci.yml` — `lint` job runs `ruff check`, `ruff format --check`, and `pylint app/` from `working-directory: backend`. `unit-tests` job runs `pytest tests/unit/ -q`. Pipeline stops on failure — no deployment.
+
+Key details:
+- `astral-sh/setup-uv@v7` with `version: "0.10.8"` — pinned to avoid surprise breaks from uv releases
+- `cache-dependency-glob: backend/uv.lock` — keys the cache on the lock file (more precise than `pyproject.toml`)
+- `ruff check --output-format=github` — emits `::error file=...::` annotations; GitHub renders these as **inline comments on the PR diff** so violations appear on the offending line, not buried in the log
 
 ### 15c. The SST diff job ✅
 
