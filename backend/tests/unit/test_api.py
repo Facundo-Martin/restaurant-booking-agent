@@ -3,6 +3,7 @@
 The agent and repository are mocked so no AWS calls are made.
 """
 
+import json
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -20,16 +21,89 @@ _SAMPLE_BOOKING = Booking(
     party_size=2,
 )
 
+_VALID_CHAT_BODY = {"messages": [{"role": "user", "content": "Hi"}]}
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def make_mock_agent(events: list[dict]) -> MagicMock:
+    """Return a mock Agent *class* whose instances yield ``events`` from stream_async.
+
+    Patches ``app.api.routes.chat.Agent`` — the class imported in the route module.
+    When the route calls ``Agent(...)``, the mock returns a configured instance
+    whose ``stream_async`` is an async generator that yields the given events.
+    """
+
+    async def _stream(_message: str):
+        for event in events:
+            yield event
+
+    instance = MagicMock()
+    instance.stream_async = _stream
+    return MagicMock(return_value=instance)
+
+
+def collect_sse_events(response) -> list[dict]:
+    """Parse ``data:`` lines from a streaming TestClient response into dicts."""
+    events = []
+    for line in response.iter_lines():
+        if line.startswith("data:"):
+            payload = line[6:].strip()  # strip "data: " prefix
+            if payload:
+                events.append(json.loads(payload))
+    return events
+
 
 # ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
 
 
-def test_health():
-    response = client.get("/health")
+def test_health_ok():
+    """Returns 200 with full dependency shape when DynamoDB is reachable."""
+    with patch("app.repositories.bookings.ping"):
+        response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["dependencies"]["dynamodb"] == "ok"
+    assert "bedrock" in body["not_checked"]
+
+
+def test_health_degraded():
+    """Returns 503 with status=degraded when DynamoDB probe fails."""
+    with patch("app.repositories.bookings.ping", side_effect=Exception("unreachable")):
+        response = client.get("/health")
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert body["dependencies"]["dynamodb"] == "error"
+
+
+# ---------------------------------------------------------------------------
+# Security headers
+# ---------------------------------------------------------------------------
+
+
+def test_security_headers_present():
+    """Every response must carry the standard security headers."""
+    response = client.get("/health")
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["x-xss-protection"] == "1; mode=block"
+
+
+def test_correlation_id_returned():
+    """X-Request-ID echoed in response when provided; generated when absent."""
+    response = client.get("/health", headers={"X-Request-ID": "test-id-123"})
+    assert response.headers["x-request-id"] == "test-id-123"
+
+    response = client.get("/health")
+    assert "x-request-id" in response.headers
 
 
 # ---------------------------------------------------------------------------
@@ -86,26 +160,204 @@ def test_delete_booking_missing_restaurant_name():
 # ---------------------------------------------------------------------------
 
 
-def test_chat_success():
-    mock_agent = MagicMock(return_value="Hello! How can I help?")
-    with patch("app.api.routes.chat.get_agent", return_value=mock_agent):
-        response = client.post("/chat", json={"message": "Hello", "session_id": "s1"})
+def test_chat_text_delta():
+    """Text tokens are forwarded as text-delta events; stream ends with done."""
+    mock_agent = make_mock_agent([{"data": "Hello"}, {"data": "!"}])
 
-    assert response.status_code == 200
-    data = response.json()
-    assert data["response"] == "Hello! How can I help?"
-    assert data["session_id"] == "s1"
+    with patch("app.api.routes.chat.Agent", mock_agent):
+        with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:
+            assert response.status_code == 200
+            events = collect_sse_events(response)
 
-
-def test_chat_no_session_id():
-    mock_agent = MagicMock(return_value="Response without session")
-    with patch("app.api.routes.chat.get_agent", return_value=mock_agent):
-        response = client.post("/chat", json={"message": "Hi"})
-
-    assert response.status_code == 200
-    assert response.json()["session_id"] is None
+    types = [e["type"] for e in events]
+    assert types == ["text-delta", "text-delta", "done"]
+    assert events[0]["delta"] == "Hello"
+    assert events[1]["delta"] == "!"
 
 
-def test_chat_missing_message():
-    response = client.post("/chat", json={"session_id": "s1"})
+def test_chat_tool_cycle():
+    """Full tool cycle: tool-call-start then tool-result then done."""
+    mock_agent = make_mock_agent(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "t-1",
+                                "name": "get_booking_details",
+                                "input": {"booking_id": "abc"},
+                            }
+                        }
+                    ],
+                }
+            },
+            {
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "toolResult": {
+                                "toolUseId": "t-1",
+                                "status": "success",
+                                "content": [{"text": "Found it"}],
+                            }
+                        }
+                    ],
+                }
+            },
+            {"data": "Your booking is confirmed."},
+        ]
+    )
+
+    with patch("app.api.routes.chat.Agent", mock_agent):
+        with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:
+            events = collect_sse_events(response)
+
+    types = [e["type"] for e in events]
+    assert types == ["tool-call-start", "tool-result", "text-delta", "done"]
+    assert events[0]["toolCallId"] == "t-1"
+    assert events[0]["toolName"] == "get_booking_details"
+    assert events[1]["toolCallId"] == "t-1"
+    assert events[1]["toolName"] == "get_booking_details"
+
+
+def test_chat_tool_error():
+    """A tool execution failure emits tool-error, not an exception."""
+    mock_agent = make_mock_agent(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "toolUse": {
+                                "toolUseId": "t-2",
+                                "name": "create_booking",
+                                "input": {},
+                            }
+                        }
+                    ],
+                }
+            },
+            {
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "toolResult": {
+                                "toolUseId": "t-2",
+                                "status": "error",
+                                "content": [{"text": "DynamoDB error"}],
+                            }
+                        }
+                    ],
+                }
+            },
+        ]
+    )
+
+    with patch("app.api.routes.chat.Agent", mock_agent):
+        with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:
+            events = collect_sse_events(response)
+
+    types = [e["type"] for e in events]
+    assert types == ["tool-call-start", "tool-error", "done"]
+    assert events[1]["error"] == "DynamoDB error"
+
+
+def test_chat_timeout_yields_error_then_done():
+    """asyncio.TimeoutError yields a user-friendly timeout error, then done."""
+
+    async def _timeout_stream(_message: str):
+        raise TimeoutError()
+        yield  # makes this an async generator
+
+    instance = MagicMock()
+    instance.stream_async = _timeout_stream
+    mock_agent = MagicMock(return_value=instance)
+
+    with patch("app.api.routes.chat.Agent", mock_agent):
+        with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:
+            assert response.status_code == 200
+            events = collect_sse_events(response)
+
+    types = [e["type"] for e in events]
+    assert types == ["error", "done"]
+    assert "timed out" in events[0]["error"].lower()
+
+
+def test_chat_exception_yields_error_then_done():
+    """An unhandled exception in the stream yields error + done — never a bare 500.
+
+    SSE always returns HTTP 200; errors are signalled in-band via the event type.
+    """
+
+    async def _erroring_stream(_message: str):
+        raise RuntimeError("Bedrock unavailable")
+        yield  # makes this an async generator so the route can iterate it
+
+    instance = MagicMock()
+    instance.stream_async = _erroring_stream
+    mock_agent = MagicMock(return_value=instance)
+
+    with patch("app.api.routes.chat.Agent", mock_agent):
+        with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:
+            assert response.status_code == 200
+            events = collect_sse_events(response)
+
+    types = [e["type"] for e in events]
+    assert types == ["error", "done"]
+    # Internal exception message must never leak to the client.
+    assert "Bedrock unavailable" not in events[0]["error"]
+    assert events[0]["error"] == "An unexpected error occurred."
+
+
+def test_chat_force_stop_yields_error_then_done():
+    """force_stop events are forwarded as error events."""
+    mock_agent = make_mock_agent(
+        [
+            {"force_stop": True, "force_stop_reason": "Token limit exceeded"},
+        ]
+    )
+
+    with patch("app.api.routes.chat.Agent", mock_agent):
+        with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:
+            events = collect_sse_events(response)
+
+    types = [e["type"] for e in events]
+    assert "error" in types
+    assert types[-1] == "done"
+
+
+def test_chat_missing_messages_field():
+    """messages is required — omitting it returns 422."""
+    response = client.post("/chat", json={})
     assert response.status_code == 422
+
+
+def test_chat_message_content_too_long():
+    """A message exceeding 4 096 characters is rejected before hitting the agent."""
+    oversized = {"messages": [{"role": "user", "content": "x" * 4097}]}
+    response = client.post("/chat", json=oversized)
+    assert response.status_code == 422
+
+
+def test_chat_too_many_messages():
+    """More than 50 messages in one request is rejected before hitting the agent."""
+    msg = {"role": "user", "content": "Hi"}
+    too_many = {"messages": [msg] * 51}
+    response = client.post("/chat", json=too_many)
+    assert response.status_code == 422
+
+
+def test_chat_done_is_always_last():
+    """done is emitted even when the stream produces no other events."""
+    mock_agent = make_mock_agent([])
+
+    with patch("app.api.routes.chat.Agent", mock_agent):
+        with client.stream("POST", "/chat", json=_VALID_CHAT_BODY) as response:
+            events = collect_sse_events(response)
+
+    assert events == [{"type": "done"}]

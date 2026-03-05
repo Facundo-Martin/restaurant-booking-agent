@@ -42,4 +42,3 @@ export type SSEEvent =
   | { type: 'tool-error'; toolCallId: string; toolName: string; error: string }
   | { type: 'done' }
   | { type: 'error'; error: string }
-

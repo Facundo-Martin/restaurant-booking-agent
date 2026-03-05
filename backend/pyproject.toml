@@ -12,6 +12,7 @@ dependencies = [
     "boto3>=1.34.0",
     "sst",
     "sse-starlette>=3.2.0",
+    "aws-lambda-powertools[tracer]>=3.25.0",
 ]
 
 [dependency-groups]
@@ -22,6 +23,7 @@ dev = [
     "moto[dynamodb]>=5.0.0",
     "ty>=0.0.1",
     "ruff>=0.9.0",
+    "pylint>=4.0.5",
 ]
 
 # SST Python SDK is not published to PyPI — install from source
@@ -39,6 +41,20 @@ ignore = ["E501"]
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 
+[tool.pylint.messages_control]
+disable = [
+    "C0301",  # line-too-long — ruff enforces line length; avoid double-reporting
+    "R0801",  # duplicate-code — false positive on structurally similar Pydantic field lists
+    "R0903",  # too-few-public-methods — Starlette middleware only requires dispatch()
+]
+
+[tool.pylint.format]
+max-line-length = 88  # match ruff
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: requires a deployed AWS test stage — set INTEGRATION_TABLE_NAME / INTEGRATION_API_URL / INTEGRATION_CHAT_URL",
+    "agent: requires real Bedrock credentials — run manually or nightly, not on every push",
+]

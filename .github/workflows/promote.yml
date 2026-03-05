@@ -1,0 +1,42 @@
+name: Promote to Production
+
+# Manually triggered. Requires typing "production" to prevent accidental deploys.
+# Also gates on the "production" GitHub Environment, which can be configured
+# with required reviewers in Settings → Environments → production.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "production" to confirm'
+        required: true
+
+jobs:
+  deploy-prod:
+    name: Deploy to production
+    # Abort if the confirmation word is wrong — last line of defence
+    if: github.event.inputs.confirm == 'production'
+    runs-on: ubuntu-latest
+    # The "production" environment can require manual approval from designated
+    # reviewers before this job runs. Configure in:
+    # Settings → Environments → production → Required reviewers
+    environment: production
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy to production
+        run: npx sst deploy --stage production

@@ -19,7 +19,7 @@ backend/sst.pyi
 # tmp files
 .#*
 
-# env 
+# env
 .env*.local
 .env
 

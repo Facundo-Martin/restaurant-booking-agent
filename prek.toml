@@ -1,0 +1,64 @@
+# prek.toml — pre-commit hook configuration
+# Powered by prek (https://github.com/j178/prek) — Rust-based, drop-in
+# alternative to pre-commit with zero dependencies and faster execution.
+#
+# Initial setup (run once per developer machine):
+#   uv tool install prek   # install the prek binary
+#   prek install           # wire hooks into .git/hooks/pre-commit
+#
+# Keep hook revisions current:
+#   prek auto-update
+
+# ---------------------------------------------------------------------------
+# Global settings — must appear before any [[repos]] section in TOML
+# ---------------------------------------------------------------------------
+fail_fast = false                         # run all hooks even if one fails
+default_language_version = { python = "3.11" }
+
+# ---------------------------------------------------------------------------
+# Python — ruff linting and formatting (backend/ only)
+# ---------------------------------------------------------------------------
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.15.2"
+hooks = [
+  # Lint: auto-fix safe violations; config is read from backend/pyproject.toml
+  { id = "ruff", args = ["--fix"], files = "^backend/" },
+  # Format: enforce ruff's formatter (replaces black)
+  { id = "ruff-format", files = "^backend/" },
+]
+
+# ---------------------------------------------------------------------------
+# Python — pylint (backend/app/ only; tests are excluded)
+# Uses the venv binary directly so no uv overhead and no CWD ambiguity.
+# Config is loaded from backend/pyproject.toml via --rcfile.
+# ---------------------------------------------------------------------------
+[[repos]]
+repo = "local"
+hooks = [
+  {
+    id = "pylint",
+    name = "pylint",
+    entry = "backend/.venv/bin/pylint",
+    language = "system",
+    types = ["python"],
+    files = "^backend/app/",
+    args = ["--rcfile=backend/pyproject.toml"],
+  },
+]
+
+# ---------------------------------------------------------------------------
+# General file hygiene — Rust-native built-ins, no network or setup required
+# ---------------------------------------------------------------------------
+[[repos]]
+repo = "builtin"
+hooks = [
+  { id = "trailing-whitespace" },
+  { id = "end-of-file-fixer" },
+  { id = "check-yaml" },
+  { id = "check-toml" },
+  { id = "check-json" },
+  { id = "detect-private-key" },
+  # Prevent accidental direct commits to the protected main branch
+  { id = "no-commit-to-branch", args = ["--branch", "main"] },
+]
