@@ -1,6 +1,6 @@
 # Taking the Backend Toward Production
 
-> **Status: sections 4–12 and 14 implemented. Section 15 (CI/CD pipeline) is next.**
+> **Status: sections 4–12, 14, and 15 implemented. Branch ready to PR.**
 
 References:
 - [Preparing FastAPI for Production](https://medium.com/@ramanbazhanau/preparing-fastapi-for-production-a-comprehensive-guide-d167e693aa2b)
@@ -811,13 +811,32 @@ uv run pytest tests/integration/test_agent.py -v
 
 ---
 
-## 15. CI/CD Pipeline
+## 15. CI/CD Pipeline ✅
 
-_A GitHub Actions pipeline that enforces quality gates before every deployment. No manual `sst deploy` once this is in place._
+Three workflow files under `.github/workflows/`. No manual `sst deploy` once these are in place.
 
-### 15a. Pipeline overview
+### 15a. Pipeline overview ✅
 
-_Five stages in order: **lint** → **unit tests** → **sst diff** → **deploy staging** → **promote prod**. The diff stage surfaces infra changes before they apply. Production promotion is a separate, manually triggered job._
+Five stages across three workflows:
+
+| Workflow | Trigger | Jobs |
+|---|---|---|
+| `ci.yml` | Every push + PRs to main | lint → unit-tests → sst-diff (PRs only) |
+| `deploy.yml` | Merge to main | deploy-staging → smoke-test |
+| `promote.yml` | Manual (`workflow_dispatch`) | deploy-production (gated by environment) |
+
+`sst.config.ts` change — omit named AWS profile in CI so the pipeline uses `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` secrets directly:
+
+```typescript
+providers: {
+  aws: {
+    region: "us-east-1",
+    ...(process.env.CI ? {} : { profile: "iamadmin-general" }),
+  },
+}
+```
+
+Also exports `ChatUrl` and `TableName` from the SST run() function so integration test env vars can be set from stack outputs after the first staging deploy.
 
 ### 15a-pre. Pre-commit hooks (prek) ✅
 
@@ -881,21 +900,28 @@ uv tool install prek
 prek install   # wires .git/hooks/pre-commit
 ```
 
-### 15b. Lint and unit tests
+### 15b. Lint and unit tests ✅
 
-_`uv run ruff check .` and `uv run pytest tests/unit/`. Run on every push and every PR. Cache the uv venv keyed on `pyproject.toml` hash. Pipeline stops on failure — no deployment._
+`ci.yml` — `lint` job runs `ruff check`, `ruff format --check`, and `pylint app/` from `working-directory: backend`. `unit-tests` job runs `pytest tests/unit/ -q`. Both cache the uv venv keyed on `backend/pyproject.toml`. Pipeline stops on failure — no deployment.
 
-### 15c. The SST diff job
+### 15c. The SST diff job ✅
 
-_`npx sst diff --stage staging` runs after tests pass. Post the diff as a PR comment. Block merge if the diff touches a retained resource (DynamoDB table, OSS collection) without an explicit `[allow-destroy]` label._
+`ci.yml` — `sst-diff` job runs only on pull requests (not direct pushes). Runs `npx sst diff --stage staging`, captures stdout, and posts/updates a PR comment titled `## SST Diff — staging`. Uses `continue-on-error: true` so the comment step always runs even if the stack doesn't exist yet (first deploy).
 
-### 15d. Deploy to staging and smoke test
+### 15d. Deploy to staging and smoke test ✅
 
-_`npx sst deploy --stage staging` on merge to `main`. Follow with `curl -f $STAGING_URL/health` — pipeline fails if the health check returns non-200._
+`deploy.yml` — `deploy-staging` job runs `npx sst deploy --stage staging` on merge to `main`. `smoke-test` job follows with `curl --fail "$STAGING_API_URL/health" | jq .`. `STAGING_API_URL` is a GitHub Repository Variable set once after first deploy (Settings → Variables → Actions).
 
-### 15e. Promote to production
+### 15e. Promote to production ✅
 
-_Triggered by a GitHub release tag or manual `workflow_dispatch`. Targets `--stage prod`. The `protect: true` and `removal: "retain"` SST config are the last line of defence against accidental deletion._
+`promote.yml` — triggered by `workflow_dispatch`. Requires typing `"production"` in the confirmation input. Gates on the `production` GitHub Environment (configure required reviewers in Settings → Environments → production). Uses separate `PROD_AWS_*` secrets. The `protect: true` and `removal: "retain"` SST config are the last line of defence against accidental deletion.
+
+**One-time setup checklist:**
+1. Create IAM user (staging): `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` → GitHub Secrets
+2. Create IAM user (production): `PROD_AWS_ACCESS_KEY_ID` + `PROD_AWS_SECRET_ACCESS_KEY` → GitHub Secrets
+3. After first staging deploy: set `STAGING_API_URL` → GitHub Repository Variable
+4. Optionally set `INTEGRATION_API_URL`, `INTEGRATION_CHAT_URL`, `INTEGRATION_TABLE_NAME` → GitHub Repository Variables (enables integration tests in CI)
+5. Create `production` GitHub Environment with required reviewers
 
 ---
 

@@ -1,0 +1,48 @@
+name: Deploy Staging
+
+# Runs on every merge to main. Deploys to the staging SST stage and
+# smoke-tests the health endpoint to confirm the deploy succeeded.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-staging:
+    name: Deploy to staging
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy to staging
+        run: npx sst deploy --stage staging
+
+  # -------------------------------------------------------------------------
+  # Smoke test — confirms the Lambda is alive and DynamoDB is reachable.
+  # STAGING_API_URL is a GitHub Repository Variable set after first deploy:
+  #   Settings → Variables → Actions → New repository variable
+  # -------------------------------------------------------------------------
+  smoke-test:
+    name: Smoke test
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check
+        run: |
+          echo "Checking ${{ vars.STAGING_API_URL }}/health"
+          curl --fail --silent --show-error \
+            "${{ vars.STAGING_API_URL }}/health" | jq .
