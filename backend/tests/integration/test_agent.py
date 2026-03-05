@@ -16,19 +16,15 @@ Run (requires AWS credentials with Bedrock InvokeModel access):
 from unittest.mock import MagicMock, patch
 
 import pytest
+from strands import Agent
+
+from app.agent import SYSTEM_PROMPT, TOOLS, model
 
 pytestmark = pytest.mark.agent
 
 _FAKE_RESTAURANTS = (
     "Available restaurants: Nonna's Hearth (Italian), Bistro Parisienne (French)."
 )
-_FAKE_BOOKING = {
-    "booking_id": "reg-test-1",
-    "restaurant_name": "Nonna's Hearth",
-    "user_id": "reg-user",
-    "date": "2099-01-01",
-    "party_size": 2,
-}
 
 
 def _tool_names(events: list) -> list[str]:
@@ -49,10 +45,6 @@ async def test_restaurant_query_calls_retrieve():
     If this fails after a model or prompt change, the agent is no longer
     routing restaurant-discovery queries to the Knowledge Base.
     """
-    from strands import Agent
-
-    from app.agent import SYSTEM_PROMPT, TOOLS, model
-
     agent = Agent(model=model, tools=TOOLS, system_prompt=SYSTEM_PROMPT)
 
     mock_retrieve = MagicMock(return_value=_FAKE_RESTAURANTS)
@@ -74,10 +66,6 @@ async def test_create_booking_not_called_without_confirmation():
     If this fails, the system prompt's confirmation instruction has been lost
     or overridden by the model.
     """
-    from strands import Agent
-
-    from app.agent import SYSTEM_PROMPT, TOOLS, model
-
     agent = Agent(model=model, tools=TOOLS, system_prompt=SYSTEM_PROMPT)
 
     events = [e async for e in agent.stream_async("Book a table for me tonight")]
