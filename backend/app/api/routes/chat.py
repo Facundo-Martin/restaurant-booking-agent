@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 from strands import Agent
+from strands.agent.conversation_manager import SlidingWindowConversationManager
 
 from app.agent import SYSTEM_PROMPT, TOOLS, model
 from app.config import MAX_AGENT_SECONDS
@@ -40,11 +41,20 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
         (m.content for m in reversed(request.messages) if m.role == "user"),
         "",
     )
+
+    # Create a conversation manager with custom window size
+    conversation_manager = SlidingWindowConversationManager(
+        window_size=40,  # Maximum number of messages to keep
+        should_truncate_results=True,  # truncate large tool results, not messages
+        per_turn=True,  # Apply management before each model cal, not just at agent loop
+    )
+
     agent = Agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
         tools=TOOLS,
         callback_handler=None,
+        conversation_manager=conversation_manager,
     )
     # Maps toolUseId → toolName so tool-result events can include the name.
     tool_names: dict[str, str] = {}
