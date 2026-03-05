@@ -111,23 +111,30 @@ agent = Agent(
 
 ---
 
-### Session Management — `[HIGH]`
+### Session Management — `[HIGH]` ✅ implemented
 
-**Current architecture:** Client sends full `messages[]` on every `/chat` request. Server is stateless. Consequences: payload grows with conversation length; browser refresh loses all history; no cross-device continuity.
+**Problem solved:** Each Lambda invocation previously started with no memory of prior turns. Client was sending the full `messages[]` array on every request as a workaround — payload grew linearly with conversation length and history was lost on browser refresh.
 
-**Strands built-in:** `S3SessionManager` — persists `AgentSession` (messages + state + conversation manager state) to S3. Keyed by `session_id`.
+**Decision: `S3SessionManager`** — chosen over three alternatives:
 
-**What a migration requires:**
-1. New S3 bucket in `infra/storage.ts`: `sst.aws.Bucket("AgentSessions")` with lifecycle rule (delete sessions older than 30 days)
-2. New `session_id` field in `ChatApiRequest` (new API field — breaking change)
-3. `Agent(session_manager=S3SessionManager(session_id=..., bucket=...))` in `chat.py`
-4. Client sends only the **new user message** + `session_id` (drops full `messages[]` array)
-5. Frontend: persist `session_id` in localStorage, pass on every request
-6. IAM: add `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`, `s3:ListBucket` to ChatFunction role
+| Option | Verdict | Reason |
+|---|---|---|
+| `FileSessionManager` | ❌ non-starter | Lambda's `/tmp` is ephemeral and not shared across instances |
+| `S3SessionManager` | ✅ chosen | Serverless, pay-per-use, ~20–50ms overhead negligible vs. Bedrock latency |
+| Valkey/Redis | ❌ overkill | ElastiCache minimum ~$15–50/month always-on; sub-10ms session reads don't matter at our scale |
+| AgentCore Memory | ❌ wrong tool | Designed for LTM *across* sessions (semantic retrieval of past preferences), not within-session continuity |
 
-**Third-party option:** `AgentCoreMemorySessionManager` — adds intelligent LTM/STM retrieval, user preference storage. More powerful but requires Bedrock AgentCore deployment. Evaluate in a follow-up phase.
+**What was implemented:**
+1. `infra/storage.ts`: `sst.aws.Bucket("AgentSessions")` + 30-day lifecycle expiry rule
+2. `infra/api.ts`: `sessionsBucket` added to ChatFunction `link` (grants S3 read/write IAM automatically)
+3. `config.py`: `SESSIONS_BUCKET = Resource.AgentSessions.name`
+4. `schemas.py`: optional `session_id: str | None` added to `ChatApiRequest` (backward-compatible — absent = stateless fallback)
+5. `chat.py`: `S3SessionManager(session_id=..., bucket=SESSIONS_BUCKET)` wired into `Agent()` when `session_id` present
+6. `use-streaming-chat.ts`: UUID generated on mount, persisted to localStorage, sent on every request; only the new user message is sent in `messages[]` (full history now lives in S3)
 
-**Interaction:** `S3SessionManager` also persists `SlidingWindowConversationManager` state (`conversation_manager_state`) so the window position survives across Lambda invocations. This is the correct integration — implement conversation management (above) first.
+**Interaction with `SlidingWindowConversationManager`:** S3SessionManager also persists the conversation manager state (`conversation_manager_state`), so the window position survives across Lambda invocations — both must be used together.
+
+**Follow-up:** `AgentCoreMemorySessionManager` — cross-session LTM (user preference storage, semantic retrieval of past interactions). Evaluate when personalization becomes a requirement.
 
 **Warning:** Cannot use a session manager on an agent that is part of a multi-agent system — only the orchestrator holds it. Not a concern for our single-agent setup.
 

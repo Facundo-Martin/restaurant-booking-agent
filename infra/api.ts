@@ -1,4 +1,4 @@
-import { table } from "./storage";
+import { table, sessionsBucket } from "./storage";
 import { knowledgeBase } from "./ai";
 
 // Lambda Powertools env vars — shared across all functions.
@@ -33,7 +33,7 @@ export const chatFunction = new sst.aws.Function("ChatFunction", {
   architecture: "arm64",
   timeout: "120 seconds",
   memory: "1024 MB",
-  link: [table, knowledgeBase],
+  link: [table, knowledgeBase, sessionsBucket],
   layers: [lwaLayerArn],
   environment: {
     ...powertoolsEnv,

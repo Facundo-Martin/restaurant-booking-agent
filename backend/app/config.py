@@ -9,6 +9,7 @@ from sst import Resource
 # that SST populated during deployment.
 TABLE_NAME: str = Resource.Bookings.name  # type: ignore[attr-defined]
 KB_ID: str = Resource.RestaurantKB.id  # type: ignore[attr-defined]
+SESSIONS_BUCKET: str = Resource.AgentSessions.name  # type: ignore[attr-defined]
 
 # Input validation limits — tune here without touching the schema definitions.
 CHAT_MAX_MESSAGE_LENGTH: int = 4096  # characters per individual message

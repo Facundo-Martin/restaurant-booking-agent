@@ -9,9 +9,10 @@ from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 from strands import Agent
 from strands.agent.conversation_manager import SlidingWindowConversationManager
+from strands.session import S3SessionManager
 
 from app.agent import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
-from app.config import MAX_AGENT_SECONDS
+from app.config import MAX_AGENT_SECONDS, SESSIONS_BUCKET
 from app.hooks import CorrelationIdHook, LimitToolCallsHook, TokenMetricsHook
 from app.logging import logger
 from app.metrics import MetricUnit, metrics
@@ -50,6 +51,15 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
         per_turn=True,  # Apply management before each model cal, not just at agent loop
     )
 
+    # S3SessionManager restores full conversation history from S3 on each Lambda invocation,
+    # solving the cold-start amnesia problem. Falls back to stateless when no session_id
+    # is provided (e.g., legacy clients or one-off queries).
+    session_manager = (
+        S3SessionManager(session_id=request.session_id, bucket=SESSIONS_BUCKET)
+        if request.session_id
+        else None
+    )
+
     hooks = [
         CorrelationIdHook(),
         TokenMetricsHook(),
@@ -64,6 +74,7 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
         conversation_manager=conversation_manager,
         retry_strategy=RETRY_STRATEGY,
         hooks=hooks,
+        session_manager=session_manager,
     )
     # Maps toolUseId → toolName so tool-result events can include the name.
     tool_names: dict[str, str] = {}
