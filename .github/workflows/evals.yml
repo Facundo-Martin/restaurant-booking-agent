@@ -1,0 +1,60 @@
+name: Evals
+
+on:
+  schedule:
+    # Run nightly at 02:00 UTC — avoids peak Bedrock throttle windows
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "SST stage to run evals against (default: staging)"
+        required: false
+        default: staging
+
+# Prevent concurrent eval runs — Bedrock inference costs money and concurrent
+# runs on the same stage share a throttle budget.
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    name: Agent Evals
+    runs-on: ubuntu-latest
+    # Only run on the main branch for scheduled runs; workflow_dispatch can run anywhere.
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
+      # Minimal SST resource stubs so config.py imports without a live deployment.
+      # Evals mock all tool I/O so no real DynamoDB or Knowledge Base is needed.
+      SST_RESOURCE_Bookings: '{"name":"eval-table"}'
+      SST_RESOURCE_RestaurantKB: '{"id":"eval-kb-id"}'
+      SST_RESOURCE_AgentSessions: '{"name":"eval-sessions"}'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.10.8"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install dev dependencies
+        run: uv sync --frozen --group dev
+        working-directory: backend
+
+      - name: Run agent evals
+        id: evals
+        run: uv run pytest tests/evals/ -m agent -v --tb=short 2>&1 | tee /tmp/eval-results.txt
+        working-directory: backend
+
+      - name: Post eval summary
+        if: always()
+        run: |
+          echo "## Agent Eval Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/eval-results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
