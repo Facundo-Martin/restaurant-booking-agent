@@ -45,6 +45,9 @@ export const chatFunction = new sst.aws.Function("ChatFunction", {
     AWS_LAMBDA_EXEC_WRAPPER: "/opt/bootstrap",
     // LWA readiness check — poll /health until uvicorn is up
     AWS_LWA_READINESS_CHECK_PATH: "/health",
+    // Prevent raw user messages (which may contain PII) from appearing verbatim
+    // in OTEL trace span attributes — caps any single attribute value at 512 chars
+    OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT: "512",
   },
   streaming: true,
   url: {

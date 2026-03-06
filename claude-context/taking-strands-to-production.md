@@ -221,21 +221,17 @@ Defense is now layered: prompt hardening (LLM-level) + Bedrock Guardrail (API-le
 
 ---
 
-### PII Redaction — `[MEDIUM]`
+### PII Redaction — `[MEDIUM]` ✅ implemented
 
-**Strands SDK position:** Does not perform PII redaction natively. Recommends third-party libs or OTEL collector-level masking.
+Defense is layered — three surfaces covered:
 
-**Attack surfaces in this codebase:**
-1. **CloudWatch Logs** — `logger.exception()` may include user message content containing names, emails, phone numbers.
-2. **OTEL traces** — Strands traces include `gen_ai.user.message` and tool inputs/outputs verbatim.
-3. **Lambda Powertools** — `log_event=True` would log the full API Gateway event (headers + body). Currently `False` — do not change.
+1. **Bedrock Guardrail PII policy** ✅ (implemented above) — masks EMAIL + PHONE in model I/O at the API layer before content reaches the agent.
+2. **`_PiiRedactionFilter`** in `app/logging.py` ✅ — lightweight regex filter (`logging.Filter` subclass) applied to both the Powertools logger and the root Python logger (covers Strands internal logs). Scrubs emails and phone numbers from log record `msg` and `args` before CloudWatch emission. No ML models, no cold-start cost.
+3. **`OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT=512`** in `infra/api.ts` ✅ — caps any single OTEL span attribute at 512 chars, preventing raw user messages from appearing verbatim in X-Ray traces.
 
-**Recommended layered approach:**
-1. **Bedrock Guardrails PII action** (Phase above) — masks PII in model outputs. Already covers the model response path when guardrails are enabled.
-2. **Log-level filter** in `app/logging.py` — add a Python `logging.Filter` subclass that regex-masks emails and phone numbers in log record messages before CloudWatch emission. Lightweight, no cold-start cost.
-3. **OTEL attribute length limit** — set `OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT=512` to prevent large user messages from appearing verbatim in trace spans.
+`log_event=False` is already set (Lambda Powertools default) — do not change; enabling it would log the full API Gateway event body including all message content.
 
-**Do NOT use** LLM Guard or Presidio in the Lambda hot path — they are ML models with significant cold-start and inference cost. Only viable in an async post-processing pipeline (CloudWatch Logs → Lambda → redact → re-ingest).
+**Not used:** LLM Guard / Presidio — ML models with significant cold-start and inference overhead. Only viable in an async post-processing pipeline, not the Lambda hot path.
 
 ---
 
