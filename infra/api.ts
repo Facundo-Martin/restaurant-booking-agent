@@ -1,6 +1,10 @@
 import { table, sessionsBucket } from "./storage";
 import { knowledgeBase, guardrail } from "./ai";
 
+// Langfuse OTLP auth header — set via: sst secret set LangfuseAuthHeader "Authorization=Basic <base64(pk:sk)>"
+// If not set, the OTEL_EXPORTER_OTLP_ENDPOINT env var is omitted and Strands telemetry is skipped.
+const langfuseAuthHeader = new sst.Secret("LangfuseAuthHeader");
+
 // Lambda Powertools env vars — shared across all functions.
 // POWERTOOLS_LOG_LEVEL is stage-aware: WARNING in production reduces log volume
 // and CloudWatch cost; INFO elsewhere gives full visibility during development.
@@ -8,6 +12,8 @@ const powertoolsEnv = {
   POWERTOOLS_SERVICE_NAME: "restaurant-booking",
   POWERTOOLS_METRICS_NAMESPACE: "RestaurantBookingAgent",
   POWERTOOLS_LOG_LEVEL: $app.stage === "production" ? "WARNING" : "INFO",
+  // Exposed to Python config.py for trace_attributes stage tagging in Langfuse
+  APP_STAGE: $app.stage,
 };
 
 export const api = new sst.aws.ApiGatewayV2("RestaurantApi", {
@@ -48,6 +54,12 @@ export const chatFunction = new sst.aws.Function("ChatFunction", {
     // Prevent raw user messages (which may contain PII) from appearing verbatim
     // in OTEL trace span attributes — caps any single attribute value at 512 chars
     OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT: "512",
+    // Langfuse OTLP trace export — only active when LangfuseAuthHeader secret is set.
+    // main.py guards on OTEL_EXPORTER_OTLP_ENDPOINT being present before calling setup_otlp_exporter().
+    OTEL_EXPORTER_OTLP_ENDPOINT: "https://us.cloud.langfuse.com/api/public/otel",
+    OTEL_EXPORTER_OTLP_HEADERS: langfuseAuthHeader.value,
+    OTEL_TRACES_SAMPLER: "traceidratio",
+    OTEL_TRACES_SAMPLER_ARG: $app.stage === "production" ? "0.1" : "1.0",
   },
   streaming: true,
   url: {

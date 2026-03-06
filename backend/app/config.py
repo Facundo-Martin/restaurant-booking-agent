@@ -33,3 +33,6 @@ GUARDRAIL_ID: str | None = getattr(
 GUARDRAIL_VERSION: str = getattr(
     getattr(Resource, "RestaurantGuardrail", None), "version", None
 ) or os.environ.get("BEDROCK_GUARDRAIL_VERSION", "DRAFT")
+
+# Stage name — injected by SST at deploy time via APP_STAGE env var; falls back to "dev" locally.
+APP_STAGE: str = os.environ.get("APP_STAGE", "dev")

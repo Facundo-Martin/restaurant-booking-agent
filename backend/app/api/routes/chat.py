@@ -12,7 +12,7 @@ from strands.agent.conversation_manager import SlidingWindowConversationManager
 from strands.session import S3SessionManager
 
 from app.agent import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
-from app.config import MAX_AGENT_SECONDS, SESSIONS_BUCKET
+from app.config import APP_STAGE, MAX_AGENT_SECONDS, SESSIONS_BUCKET
 from app.hooks import CorrelationIdHook, LimitToolCallsHook, TokenMetricsHook
 from app.logging import logger
 from app.metrics import MetricUnit, metrics
@@ -75,6 +75,10 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
         retry_strategy=RETRY_STRATEGY,
         hooks=hooks,
         session_manager=session_manager,
+        trace_attributes={
+            "session.id": request.session_id or get_correlation_id(),
+            "langfuse.tags": [APP_STAGE],
+        },
     )
     # Maps toolUseId → toolName so tool-result events can include the name.
     tool_names: dict[str, str] = {}
