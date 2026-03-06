@@ -1835,6 +1835,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
+    { name = "strands-agents-evals" },
     { name = "ty" },
 ]
 
@@ -1859,6 +1860,7 @@ dev = [
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.24.0" },
     { name = "ruff", specifier = ">=0.9.0" },
+    { name = "strands-agents-evals", specifier = ">=0.1.0" },
     { name = "ty", specifier = ">=0.0.1" },
 ]
 
@@ -2118,6 +2120,27 @@ wheels = [
 [package.optional-dependencies]
 otel = [
     { name = "opentelemetry-exporter-otlp-proto-http" },
+]
+
+[[package]]
+name = "strands-agents-evals"
+version = "0.1.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "boto3" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation-threading" },
+    { name = "opentelemetry-sdk" },
+    { name = "pydantic" },
+    { name = "rich" },
+    { name = "strands-agents" },
+    { name = "strands-agents-tools" },
+    { name = "tenacity" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b6/09/f57c8fc648c8f95152108f69a00018ffb4b1c56078b8c3e89b6c54790d37/strands_agents_evals-0.1.9.tar.gz", hash = "sha256:93b474db6b0c56b9e5ea3edd3ce76fe725e91e9ea31b7697e6b4bc74c58c8dc9", size = 143021, upload-time = "2026-03-04T21:17:28.563Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8c/83/83e327461ba5a676b85f7b31e545906f566d27d20e2ba8da03f1b7e066c6/strands_agents_evals-0.1.9-py3-none-any.whl", hash = "sha256:55e908e53e1d7369767a2abf27d34b6eb3eaf3245648469b726b9e171c30862f", size = 125529, upload-time = "2026-03-04T21:17:27.246Z" },
 ]
 
 [[package]]
