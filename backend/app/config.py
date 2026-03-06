@@ -23,10 +23,13 @@ BOOKING_MAX_SPECIAL_REQUESTS_LENGTH: int = 500
 # so a timeout is necessary even with retries in place.
 MAX_AGENT_SECONDS: int = 110
 
-# Bedrock Guardrail — optional. When set, the guardrail is evaluated on every
-# model invocation before the response reaches the agent. Leave unset in dev/test;
-# set via SST link once a guardrail is deployed (see infra/ai.ts).
-# BEDROCK_GUARDRAIL_VERSION defaults to "DRAFT" so the latest saved version is
-# used automatically during the guardrail authoring phase.
-GUARDRAIL_ID: str | None = os.environ.get("BEDROCK_GUARDRAIL_ID")
-GUARDRAIL_VERSION: str = os.environ.get("BEDROCK_GUARDRAIL_VERSION", "DRAFT")
+# Bedrock Guardrail — injected via SST link from infra/ai.ts (RestaurantGuardrail).
+# GUARDRAIL_VERSION is the published version string; "DRAFT" uses the latest saved draft,
+# which is fine during authoring. Pin to "1" (or higher) for production deployments.
+# Falls back to env vars so local uvicorn runs without a linked guardrail still work.
+GUARDRAIL_ID: str | None = getattr(
+    getattr(Resource, "RestaurantGuardrail", None), "id", None
+) or os.environ.get("BEDROCK_GUARDRAIL_ID")
+GUARDRAIL_VERSION: str = getattr(
+    getattr(Resource, "RestaurantGuardrail", None), "version", None
+) or os.environ.get("BEDROCK_GUARDRAIL_VERSION", "DRAFT")

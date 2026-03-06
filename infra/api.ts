@@ -1,5 +1,5 @@
 import { table, sessionsBucket } from "./storage";
-import { knowledgeBase } from "./ai";
+import { knowledgeBase, guardrail } from "./ai";
 
 // Lambda Powertools env vars — shared across all functions.
 // POWERTOOLS_LOG_LEVEL is stage-aware: WARNING in production reduces log volume
@@ -33,7 +33,7 @@ export const chatFunction = new sst.aws.Function("ChatFunction", {
   architecture: "arm64",
   timeout: "120 seconds",
   memory: "1024 MB",
-  link: [table, knowledgeBase, sessionsBucket],
+  link: [table, knowledgeBase, sessionsBucket, guardrail],
   layers: [lwaLayerArn],
   environment: {
     ...powertoolsEnv,

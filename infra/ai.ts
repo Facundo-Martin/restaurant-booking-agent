@@ -192,6 +192,48 @@ sst.Linkable.wrap(aws.bedrock.AgentKnowledgeBase, (kb) => ({
   ],
 }));
 
+// Bedrock Guardrail — enforces topic boundaries, blocks harmful content, and anonymises PII
+// before it reaches the model or appears in responses. Evaluated on every model invocation.
+// When triggered, Strands sets stop_reason="guardrail_intervened" and overwrites the
+// offending message in conversation history; the existing force_stop handler in chat.py covers it.
+const guardrail = new aws.bedrock.Guardrail("RestaurantGuardrail", {
+  name: `${$app.name}-${$app.stage}`,
+  blockedInputMessaging: "I can only help with restaurant discovery and bookings.",
+  blockedOutputsMessaging: "I can only help with restaurant discovery and bookings.",
+  topicPolicyConfig: {
+    topicsConfigs: [
+      {
+        name: "off-topic",
+        definition: "Any topic unrelated to restaurant discovery, menus, or table reservations.",
+        type: "DENY",
+      },
+    ],
+  },
+  contentPolicyConfig: {
+    filtersConfigs: [
+      { type: "HATE", inputStrength: "HIGH", outputStrength: "HIGH" },
+      { type: "VIOLENCE", inputStrength: "HIGH", outputStrength: "HIGH" },
+      { type: "PROMPT_ATTACK", inputStrength: "HIGH", outputStrength: "NONE" },
+    ],
+  },
+  sensitiveInformationPolicyConfig: {
+    piiEntitiesConfigs: [
+      { type: "EMAIL", action: "ANONYMIZE" },
+      { type: "PHONE", action: "ANONYMIZE" },
+      { type: "CREDIT_DEBIT_CARD_NUMBER", action: "BLOCK" },
+    ],
+  },
+  // AWS managed profanity list — blocks profane words in both inputs and outputs
+  wordPolicyConfig: {
+    managedWordListsConfigs: [{ type: "PROFANITY" }],
+  },
+});
+
+// Register with SST link so guardrailId + version are injected into the chat Lambda at deploy time
+sst.Linkable.wrap(aws.bedrock.Guardrail, (g) => ({
+  properties: { id: g.guardrailId, version: g.version },
+}));
+
 // Upload kb-documents/ to S3 on every deploy, then kick off a Bedrock ingestion job.
 // Note: Path is relative to .sst/platform/ (SST's Pulumi CWD), so ../../ reaches the project root.
 const syncDocs = new command.local.Command(
@@ -210,4 +252,4 @@ new command.local.Command(
   { dependsOn: [syncDocs] },
 );
 
-export { knowledgeBase };
+export { knowledgeBase, guardrail };
