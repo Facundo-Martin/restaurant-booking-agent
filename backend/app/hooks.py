@@ -44,13 +44,38 @@ class TokenMetricsHook(HookProvider):  # pylint: disable=too-few-public-methods
     def _emit(self, event: AfterInvocationEvent) -> None:
         if event.result is None:
             return
-        usage = event.result.metrics.accumulated_usage
+        m = event.result.metrics
+        usage = m.accumulated_usage
+
+        # EMF time-series metrics — aggregated in CloudWatch for dashboards and alarms
         metrics.add_metric("InputTokens", MetricUnit.Count, usage.get("inputTokens", 0))
         metrics.add_metric(
             "OutputTokens", MetricUnit.Count, usage.get("outputTokens", 0)
         )
-        metrics.add_metric(
-            "AgentCycles", MetricUnit.Count, event.result.metrics.cycle_count
+        metrics.add_metric("AgentCycles", MetricUnit.Count, m.cycle_count)
+
+        # Structured log entry — per-request detail, queryable via CW Logs Insights.
+        # PII-safe: only stats (counts/latencies), never tool inputs/outputs or message content.
+        # Do NOT log m.get_summary() — its traces[].message fields contain raw conversation content.
+        logger.info(
+            "agent_invocation_complete",
+            extra={
+                "input_tokens": usage.get("inputTokens", 0),
+                "output_tokens": usage.get("outputTokens", 0),
+                "total_tokens": usage.get("totalTokens", 0),
+                "cycle_count": m.cycle_count,
+                "total_duration_s": round(sum(m.cycle_durations), 3),
+                "stop_reason": getattr(event.result, "stop_reason", None),
+                "tool_stats": {
+                    name: {
+                        "calls": tm.call_count,
+                        "errors": tm.error_count,
+                        "avg_latency_ms": round(tm.average_latency * 1000, 1),
+                        "success_rate": round(tm.success_rate, 3),
+                    }
+                    for name, tm in m.tool_metrics.items()
+                },
+            },
         )
 
 
