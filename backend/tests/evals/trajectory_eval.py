@@ -2,6 +2,9 @@
 # Run from the backend/ directory:
 #   PYTHONPATH=. SST_RESOURCE_Bookings='{"name":"<table>"}' SST_RESOURCE_RestaurantKB='{"id":"<kb-id>"}' \
 #   uv run python -u tests/evals/trajectory_eval.py
+import asyncio
+import sys
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from strands import Agent
@@ -27,8 +30,8 @@ _FAKE_BOOKING = {
 }
 
 
-# Define task function that captures tool usage
-def get_response_with_tools(case: Case) -> dict:
+# Define async task function — cases run concurrently via run_evaluations_async
+async def get_response_with_tools(case: Case) -> dict:
     print(f"  Running case: {case.name!r} ...", flush=True)
 
     mock_booking = MagicMock()
@@ -49,7 +52,7 @@ def get_response_with_tools(case: Case) -> dict:
         patch("strands_tools.retrieve", MagicMock(return_value=_FAKE_RESTAURANTS)),
         patch("app.tools.bookings.booking_repo", mock_repo),
     ):
-        response = agent(case.input)
+        response = await agent.invoke_async(case.input)
 
     trajectory = tools_use_extractor.extract_agent_tools_used_from_messages(
         agent.messages
@@ -58,6 +61,11 @@ def get_response_with_tools(case: Case) -> dict:
     print(f"  Done: {case.name!r}", flush=True)
     return {"output": str(response), "trajectory": trajectory}
 
+
+# TODO: add absolute-date validation case once system prompt rule 2 is verified in prod.
+# Example: input="Book for March 5th at 7pm for 2", expected_trajectory=["current_time"]
+# The agent should call current_time to check if March 5th is in the valid 60-day window,
+# then reject or proceed accordingly. Needs a real deployment date to set a stable fixed date.
 
 # Create test cases with expected tool usage
 test_cases = [
@@ -87,6 +95,9 @@ test_cases = [
     ),
 ]
 
+# Haiku as judge: faster + cheaper than Sonnet with no meaningful accuracy loss for rubric scoring.
+_JUDGE_MODEL = "us.anthropic.claude-haiku-4-5-20251001"
+
 # Create trajectory evaluator
 evaluator = TrajectoryEvaluator(
     rubric="""
@@ -109,6 +120,7 @@ evaluator = TrajectoryEvaluator(
                the required prior steps.
     """,
     include_inputs=True,
+    model=_JUDGE_MODEL,
 )
 
 # Seed the evaluator with tool descriptions to prevent context overflow
@@ -117,16 +129,33 @@ evaluator.update_trajectory_description(
     tools_use_extractor.extract_tools_description(sample_agent, is_short=True)
 )
 
-# Create and run experiment
-experiment = Experiment[str, str](cases=test_cases, evaluators=[evaluator])
-print(f"Running {len(test_cases)} cases ...", flush=True)
-reports = experiment.run_evaluations(get_response_with_tools)
-print("Evaluations complete. Generating report ...", flush=True)
+_PASS_THRESHOLD = 0.85  # Fail CI if fewer than 85% of cases pass
 
-# Display results
-print("=== Tool Trajectory Evaluation Results ===")
-reports[0].run_display()
 
-# Save experiment
-experiment.to_file("trajectory_evaluation")
-print("\nExperiment saved to ./experiment_files/trajectory_evaluation.json")
+async def main() -> None:
+    experiment = Experiment[str, str](cases=test_cases, evaluators=[evaluator])
+    print(f"Running {len(test_cases)} cases concurrently ...", flush=True)
+    reports = await experiment.run_evaluations_async(get_response_with_tools)
+    print("Evaluations complete. Generating report ...", flush=True)
+
+    print("=== Tool Trajectory Evaluation Results ===")
+    report = reports[0]
+    report.run_display()
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    experiment.to_file(f"trajectory_evaluation_{ts}")
+    print(f"\nExperiment saved to ./experiment_files/trajectory_evaluation_{ts}.json")
+
+    passed = sum(1 for r in report.results if r.test_pass)
+    pass_rate = passed / len(report.results)
+    print(f"\nPass rate: {passed}/{len(report.results)} ({pass_rate:.0%})")
+    if pass_rate < _PASS_THRESHOLD:
+        print(
+            f"ERROR: pass rate {pass_rate:.0%} is below threshold {_PASS_THRESHOLD:.0%}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
