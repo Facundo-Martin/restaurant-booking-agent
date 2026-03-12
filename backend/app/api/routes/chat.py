@@ -11,9 +11,9 @@ from strands import Agent
 from strands.agent.conversation_manager import SlidingWindowConversationManager
 from strands.session import S3SessionManager
 
-from app.agent import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
+from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
+from app.agent.hooks import CorrelationIdHook, LimitToolCallsHook, TokenMetricsHook
 from app.config import APP_STAGE, MAX_AGENT_SECONDS, SESSIONS_BUCKET
-from app.hooks import CorrelationIdHook, LimitToolCallsHook, TokenMetricsHook
 from app.logging import logger
 from app.metrics import MetricUnit, metrics
 from app.middleware import get_correlation_id
