@@ -96,7 +96,7 @@ test_cases = [
 ]
 
 # Haiku as judge: faster + cheaper than Sonnet with no meaningful accuracy loss for rubric scoring.
-_JUDGE_MODEL = "us.anthropic.claude-haiku-4-5-20251001"
+_JUDGE_MODEL = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 
 # Create trajectory evaluator
 evaluator = TrajectoryEvaluator(

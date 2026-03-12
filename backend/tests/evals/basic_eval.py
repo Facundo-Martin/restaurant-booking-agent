@@ -12,7 +12,6 @@ from strands_evals.evaluators import OutputEvaluator
 
 from app.agent.prompts import SYSTEM_PROMPT
 
-# No SST deps — BedrockModel created directly; no tools needed for language-only cases.
 _model = BedrockModel(
     model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
     additional_request_fields={"thinking": {"type": "disabled"}},
@@ -100,7 +99,7 @@ test_cases = [
 ]
 
 # Haiku as judge: faster + cheaper than Sonnet with no meaningful accuracy loss for rubric scoring.
-_JUDGE_MODEL = "us.anthropic.claude-haiku-4-5-20251001"
+_JUDGE_MODEL = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 
 # Create evaluator with custom rubric
 evaluator = OutputEvaluator(
