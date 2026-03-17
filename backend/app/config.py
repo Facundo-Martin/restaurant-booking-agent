@@ -27,12 +27,14 @@ MAX_AGENT_SECONDS: int = 110
 # GUARDRAIL_VERSION is the published version string; "DRAFT" uses the latest saved draft,
 # which is fine during authoring. Pin to "1" (or higher) for production deployments.
 # Falls back to env vars so local uvicorn runs without a linked guardrail still work.
-GUARDRAIL_ID: str | None = getattr(
-    getattr(Resource, "RestaurantGuardrail", None), "id", None
-) or os.environ.get("BEDROCK_GUARDRAIL_ID")
-GUARDRAIL_VERSION: str = getattr(
-    getattr(Resource, "RestaurantGuardrail", None), "version", None
-) or os.environ.get("BEDROCK_GUARDRAIL_VERSION", "DRAFT")
+# getattr() cannot be used here — SST raises Exception (not AttributeError) when links
+# are inactive, bypassing getattr's default. A try/except is required.
+try:
+    GUARDRAIL_ID: str | None = Resource.RestaurantGuardrail.id  # type: ignore[attr-defined]
+    GUARDRAIL_VERSION: str = Resource.RestaurantGuardrail.version  # type: ignore[attr-defined]
+except Exception:  # pylint: disable=broad-exception-caught
+    GUARDRAIL_ID = os.environ.get("BEDROCK_GUARDRAIL_ID")
+    GUARDRAIL_VERSION = os.environ.get("BEDROCK_GUARDRAIL_VERSION", "DRAFT")
 
 # Stage name — injected by SST at deploy time via APP_STAGE env var; falls back to "dev" locally.
 APP_STAGE: str = os.environ.get("APP_STAGE", "dev")
