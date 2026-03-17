@@ -1,6 +1,219 @@
 # Enhancing Observability and Evaluations
 
-> **Status: research / decision pending.** This document covers the platform landscape, honest trade-off analysis, and a recommended path forward for improving observability and evals beyond the current Langfuse + Strands Evals baseline.
+> **Status: Phase 1 (evaluators) ready to implement. Phase 2 (platform migration) is research / decision pending.**
+
+---
+
+## Phase 1 — Missing Strands Evaluators (Implement First)
+
+The current eval suite has two files:
+- `trajectory_eval.py` — verifies the agent calls the right tools in the right order
+- `advanced_eval.py` — boilerplate placeholder, not yet implemented
+
+Three evaluators from the Strands Evals SDK directly address gaps in the current booking agent and should be added before any observability platform work. They are independent, don't require Arize, and run in CI today.
+
+### Why these three matter
+
+| Evaluator | Level | Gap it fills |
+|---|---|---|
+| `FaithfulnessEvaluator` | TRACE | Detects RAG hallucination — agent inventing restaurants/menu items not in the knowledge base |
+| `GoalSuccessRateEvaluator` | SESSION | Measures end-to-end booking completion — did the user actually get a confirmed booking? |
+| `ToolParameterAccuracyEvaluator` | TOOL | Catches hallucinated booking parameters — wrong date, wrong party size, wrong restaurant name passed to `create_booking` |
+
+The trajectory eval already checks *which* tools fire and *in what order*. These three check *what the tools were given* and *whether the outcome was correct* — entirely different signal.
+
+---
+
+### 1. `FaithfulnessEvaluator` — RAG Hallucination Detection
+
+**What it catches:** The agent invents facts not present in the knowledge base response — e.g., claims a restaurant is open on Mondays when the KB says it's closed, or mentions dishes not in the menu.
+
+**Why it matters:** The `retrieve` tool returns raw knowledge base text. The model synthesizes a response from that text. Faithfulness measures whether the response is grounded in the retrieval result. This is the primary failure mode for RAG systems.
+
+**Evaluator level:** TRACE (evaluates a single agent invocation and its retrieval context)
+
+**Implementation outline (`tests/evals/faithfulness_eval.py`):**
+
+```python
+from strands_evals import Case, Experiment
+from strands_evals.evaluators import FaithfulnessEvaluator
+
+# Faithfulness compares the agent's final response against the retrieved context.
+# Cases must provide both the user query and the expected retrieval context so
+# the judge can determine whether the answer is grounded.
+test_cases = [
+    Case[str, str](
+        name="faithfulness-closed-monday",
+        input="Is Bistro Parisienne open on Mondays?",
+        # ground_truth is the retrieval context the agent should have used.
+        # The evaluator checks: does the response faithfully reflect this?
+        ground_truth="Bistro Parisienne (French, closed Mondays, accepts reservations)",
+        metadata={"category": "faithfulness"},
+    ),
+    Case[str, str](
+        name="faithfulness-italian-only",
+        input="What Italian restaurants do you have?",
+        ground_truth=(
+            "Available restaurants: Nonna's Hearth (Italian), "
+            "Bistro Parisienne (French), Sakura Garden (Japanese)"
+        ),
+        # Agent should mention only Nonna's Hearth — not hallucinate other Italian places.
+        metadata={"category": "faithfulness"},
+    ),
+    Case[str, str](
+        name="faithfulness-no-invented-hours",
+        input="What time does Sakura Garden open?",
+        ground_truth="Sakura Garden (Japanese, open daily, accepts reservations)",
+        # KB doesn't mention opening hours — agent should not invent a specific time.
+        metadata={"category": "faithfulness"},
+    ),
+]
+
+evaluator = FaithfulnessEvaluator(model=_JUDGE_MODEL)
+```
+
+**Key test design rule:** Include cases where the KB *doesn't* contain the answer. The agent should admit uncertainty, not fill in plausible-sounding details. Faithfulness score < 1.0 on those cases is a hallucination.
+
+---
+
+### 2. `GoalSuccessRateEvaluator` — End-to-End Booking Completion
+
+**What it catches:** Multi-turn conversations where the agent technically follows the tool trajectory but fails to land the user on a confirmed booking. Trajectory eval checks steps; goal success checks outcomes.
+
+**Why it matters:** A user might receive the right tool calls (current_time → retrieve → create_booking) but still not get a booking — e.g., the agent summarizes the booking incorrectly, doesn't confirm clearly, or goes off-script mid-flow. Goal success is the only metric that directly measures whether the product *works*.
+
+**Evaluator level:** SESSION (evaluates a full multi-turn conversation, not a single turn)
+
+**Implementation outline:**
+
+```python
+from strands_evals.evaluators import GoalSuccessRateEvaluator
+
+# GoalSuccessRateEvaluator needs multi-turn conversation histories.
+# Each case provides a complete conversation and a success criterion.
+booking_conversation = [
+    {"role": "user", "content": "I want to book a table at Nonna's Hearth for 2 people on March 20th"},
+    {"role": "assistant", "content": "I'll check availability and create a booking for you."},
+    # ... intermediate turns ...
+    {"role": "assistant", "content": "Your booking is confirmed! Booking ID: B-456, "
+        "Nonna's Hearth, March 20th, party of 2."},
+]
+
+test_cases = [
+    Case(
+        name="goal-booking-confirmed",
+        input=booking_conversation,
+        ground_truth="User successfully received a confirmed booking with ID, restaurant, date, and party size.",
+        metadata={"category": "goal-success"},
+    ),
+    Case(
+        name="goal-clarification-then-booking",
+        input=[
+            {"role": "user", "content": "Book me a table tonight"},
+            {"role": "assistant", "content": "I'd be happy to help! Which restaurant, what time, and how many guests?"},
+            {"role": "user", "content": "Nonna's Hearth, 7pm, just me"},
+            # agent should resolve date, check restaurant, confirm booking
+        ],
+        ground_truth="User received a confirmed booking after providing clarification details.",
+        metadata={"category": "goal-success"},
+    ),
+    Case(
+        name="goal-cancellation-confirmed",
+        input=[
+            {"role": "user", "content": "Cancel booking B-456"},
+            # agent should confirm cancellation clearly
+        ],
+        ground_truth="User received confirmation that booking B-456 was cancelled.",
+        metadata={"category": "goal-success"},
+    ),
+]
+
+evaluator = GoalSuccessRateEvaluator(model=_JUDGE_MODEL)
+```
+
+**Note on SESSION-level eval:** `GoalSuccessRateEvaluator` is designed for multi-turn conversations. Single-turn evals (like trajectory_eval.py) capture one request; goal success captures whether a complete user journey succeeded. These don't overlap — both are needed.
+
+---
+
+### 3. `ToolParameterAccuracyEvaluator` — Hallucinated Booking Parameters
+
+**What it catches:** The agent calls `create_booking` with parameters that don't match what the user specified — e.g., calls with `party_size=4` when user said "2 people", or `date="2026-03-21"` when user said "20th", or `restaurant_name="Nonna Hearth"` (abbreviated) instead of the exact name in the KB.
+
+**Why it matters:** Trajectory eval confirms `create_booking` is called. This confirms it's called with *correct* arguments. A wrong booking is worse than no booking — the user may not notice until they arrive at the restaurant.
+
+**Evaluator level:** TOOL (evaluates the inputs and outputs of individual tool calls)
+
+**Implementation outline:**
+
+```python
+from strands_evals.evaluators import ToolParameterAccuracyEvaluator
+
+test_cases = [
+    Case(
+        name="param-accuracy-party-size",
+        input="Book a table for 2 at Nonna's Hearth on March 20th",
+        # Expected tool call parameters — evaluator checks agent's actual call matches
+        expected_tool_call={
+            "tool_name": "create_booking",
+            "parameters": {
+                "party_size": 2,
+                "restaurant_name": "Nonna's Hearth",
+                # date is resolved at runtime; test that it's not hallucinated
+            },
+        },
+        metadata={"category": "param-accuracy"},
+    ),
+    Case(
+        name="param-accuracy-exact-restaurant-name",
+        input="Book me a table at Nonna's Hearth for 3 people next Friday",
+        expected_tool_call={
+            "tool_name": "create_booking",
+            "parameters": {
+                "restaurant_name": "Nonna's Hearth",  # exact KB name, not abbreviated
+                "party_size": 3,
+            },
+        },
+        metadata={"category": "param-accuracy"},
+    ),
+    Case(
+        name="param-accuracy-booking-id-lookup",
+        input="What are the details for booking B-456?",
+        expected_tool_call={
+            "tool_name": "get_booking_details",
+            "parameters": {"booking_id": "B-456"},
+        },
+        metadata={"category": "param-accuracy"},
+    ),
+]
+
+evaluator = ToolParameterAccuracyEvaluator(model=_JUDGE_MODEL)
+```
+
+---
+
+### Implementation order and file layout
+
+Implement as three separate eval files (same pattern as `trajectory_eval.py`):
+
+```
+backend/tests/evals/
+├── trajectory_eval.py       # ✅ exists
+├── faithfulness_eval.py     # implement first (simplest, no multi-turn needed)
+├── goal_success_eval.py     # implement second (requires multi-turn test data)
+├── tool_param_eval.py       # implement third (requires actual tool call inspection)
+└── advanced_eval.py         # boilerplate placeholder — refactor into above files
+```
+
+All three use the same `_JUDGE_MODEL` (Haiku), same `_FAKE_RESTAURANTS` / `_FAKE_BOOKING` constants from `trajectory_eval.py`, same `asyncio.Semaphore(2)` concurrency cap. Factor shared fixtures into a `conftest.py` or a `_shared.py` module.
+
+### Relationship to Arize / Phase 2
+
+These Strands Evals evaluators are **offline CI evals** — they run against staged test cases in GitHub Actions before deploy. Arize's online evals run against *live production traffic* after deploy. They are complementary, not redundant:
+
+- Strands Evals catches regressions *before* they reach production (shift-left)
+- Arize online evals catch issues that only appear on *real user traffic* (production drift)
+
+Implement Phase 1 regardless of whether Phase 2 (Arize) is adopted. The CI coverage is valuable on its own.
 
 ---
 
