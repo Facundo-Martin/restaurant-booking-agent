@@ -1,6 +1,6 @@
 # Taking Strands Agents to Production
 
-> **Status: planning phase — reviewed against Strands SDK docs via MCP.**
+> **Status: complete — all items implemented. Branch `facundomartin98/fac-165-take-strands-agents-into-production`.**
 
 Items are grouped by SDK documentation category and listed in **priority order within each category**. Irrelevant items are noted with `[SKIP]` and a rationale so they're not revisited.
 
@@ -10,104 +10,58 @@ Priority tags: `[IMMEDIATE]` active risk · `[HIGH]` implement soon · `[MEDIUM]
 
 ## Category 1 — Concepts (Foundations & Development)
 
-### Conversation Management — `[IMMEDIATE]`
+### Conversation Management — `[IMMEDIATE]` ✅ implemented
 
-**Gap:** Agent is created per-request; client sends full message history on every call. Nothing prevents a long conversation from exceeding Claude's context window, causing an unhandled exception inside `stream_async`.
-
-**What to implement:** Pass `SlidingWindowConversationManager` when constructing the Agent in `chat.py`:
+**What was implemented:** `SlidingWindowConversationManager` wired into `Agent()` in `chat.py`:
 ```python
-from strands.agent.conversation_manager import SlidingWindowConversationManager
-
-agent = Agent(
-    model=model,
-    tools=TOOLS,
-    system_prompt=SYSTEM_PROMPT,
-    conversation_manager=SlidingWindowConversationManager(
-        window_size=40,              # CHAT_MAX_MESSAGES=50 + headroom for tool-result messages
-        should_truncate_results=True,
-        per_turn=True,               # trim before each model call, not just at loop end
-    ),
+conversation_manager = SlidingWindowConversationManager(
+    window_size=40,              # headroom above CHAT_MAX_MESSAGES=50
+    should_truncate_results=True,
+    per_turn=True,               # trim before each model call, not just at loop end
 )
 ```
-**Why `per_turn=True`:** The booking agent can call retrieve + 3 booking tools per turn. Without per-turn trimming, context can overflow mid-loop before `apply_management` runs at the end.
+**Why `per_turn=True`:** The booking agent can call retrieve + 3 booking tools per turn. Without per-turn trimming, context can overflow mid-loop before `apply_management` runs.
 
-**Consider later:** `SummarizingConversationManager` — preserves older context by summarizing it rather than discarding. Costs one extra Bedrock call per summarization. Appropriate when session management (Category 1 / Session Management) lands and conversation continuity across sessions matters.
+**`S3SessionManager` persists conversation manager state** across Lambda invocations, so the sliding window position survives cold starts. Both must be used together.
+
+**Consider later:** `SummarizingConversationManager` — preserves older context by summarizing rather than discarding. Appropriate if session continuity across many long conversations becomes a requirement.
 
 ---
 
-### Retry Strategies — `[IMMEDIATE]`
+### Retry Strategies — `[IMMEDIATE]` ✅ implemented
 
-**Gap:** Two independent retry layers interact badly:
-1. **boto3** layer: `AWS_RETRY_MODE=standard`, `AWS_MAX_ATTEMPTS=3` (set in `agent.py`) — handles transient HTTP errors.
-2. **Strands `ModelRetryStrategy`** default: **6 total attempts**, initial delay 4s, doubling each attempt → worst-case wait **4+8+16+32+64 = 124s** before exception — **exceeds our `asyncio.timeout(110s)`**.
-
-**Risk:** Strands retries can exhaust the Lambda timeout budget before `TimeoutError` fires, so Lambda kills the execution environment mid-stream instead of our `finally: yield done` running.
-
-**What to implement:**
+**What was implemented:** `RETRY_STRATEGY` module-level singleton in `backend/app/agent/core.py`:
 ```python
-from strands import Agent, ModelRetryStrategy
-
-agent = Agent(
-    model=model,
-    tools=TOOLS,
-    system_prompt=SYSTEM_PROMPT,
-    retry_strategy=ModelRetryStrategy(
-        max_attempts=3,  # matches AWS_MAX_ATTEMPTS — 1 initial + 2 retries
-        initial_delay=2,
-        max_delay=20,    # worst case: 2+4+20 = 26s — well within 110s budget
-    ),
+RETRY_STRATEGY = ModelRetryStrategy(
+    max_attempts=3,   # 1 initial + 2 retries — matches AWS_MAX_ATTEMPTS
+    initial_delay=2,
+    max_delay=20,     # worst case: 2+4+20 = 26s — well within 110s asyncio.timeout
 )
 ```
-**Note:** `ModelRetryStrategy` handles `ModelThrottledException` only. For retrying on other exception types (e.g., `ServiceUnavailableException`), use the `AfterModelCallEvent` hook with `event.retry = True` instead (see Hooks below).
+Also set via env vars at module load (apply to every internal boto3 client Strands creates):
+```python
+os.environ.setdefault("AWS_RETRY_MODE", "standard")
+os.environ.setdefault("AWS_MAX_ATTEMPTS", "3")
+```
+**Why:** Strands' default is 6 attempts × exponential backoff → worst-case 124s, exceeding `asyncio.timeout(110s)` and killing the Lambda mid-stream before `finally: yield done` fires.
+
+**Note:** `ModelRetryStrategy` handles `ModelThrottledException` only. Transient HTTP errors are handled by the boto3 standard retry layer above.
 
 ---
 
-### Hooks — `[HIGH]`
+### Hooks — `[HIGH]` ✅ implemented
 
-**What Strands Hooks provide:** Strongly-typed callbacks at every point in the agent lifecycle. Key events: `BeforeInvocationEvent`, `AfterInvocationEvent`, `BeforeModelCallEvent`, `AfterModelCallEvent`, `BeforeToolCallEvent`, `AfterToolCallEvent`, `MessageAddedEvent`.
+**What was implemented:** Three hooks in `backend/app/agent/hooks.py`, wired into `Agent()` in `chat.py`:
 
-**Three concrete hooks for this codebase — implement in `app/hooks.py`:**
+**Hook A: `CorrelationIdHook`** — injects the request correlation ID into the Powertools logger at `BeforeInvocationEvent` so every log line inside the Strands event loop (model calls, tool calls) carries it.
 
-**Hook A: Correlation ID injection**
-```python
-class CorrelationIdHook(HookProvider):
-    def register_hooks(self, registry):
-        registry.add_callback(BeforeInvocationEvent, self.inject_correlation_id)
+**Hook B: `TokenMetricsHook`** — at `AfterInvocationEvent` reads `event.result.metrics.accumulated_usage` and:
+- emits EMF metrics (`InputTokens`, `OutputTokens`, `AgentCycles`) to CloudWatch
+- logs `agent_invocation_complete` structured entry with full per-tool stats (calls, errors, avg_latency_ms, success_rate) — queryable via CloudWatch Logs Insights
 
-    def inject_correlation_id(self, event):
-        logger.append_keys(correlation_id=get_correlation_id())
-```
-Ensures every log line inside the agent loop (model calls, tool calls) carries the request correlation ID — currently they don't.
+**Hook C: `LimitToolCallsHook`** — custom implementation (not from SDK cookbook; SDK cookbook version did not exist at the time). Tracks per-tool call counts at `BeforeToolCallEvent` and sets `event.cancel_tool` when the limit is exceeded. Limits: `retrieve=10`, `create_booking=3`, `delete_booking=2`. Uses a `threading.Lock` because tool callbacks may run concurrently with a thread executor.
 
-**Hook B: Token usage → CloudWatch Metrics**
-```python
-class TokenMetricsHook(HookProvider):
-    def register_hooks(self, registry):
-        registry.add_callback(AfterInvocationEvent, self.emit_token_metrics)
-
-    def emit_token_metrics(self, event):
-        usage = event.agent.metrics.accumulated_usage
-        metrics.add_metric("InputTokens", MetricUnit.Count, usage.get("inputTokens", 0))
-        metrics.add_metric("OutputTokens", MetricUnit.Count, usage.get("outputTokens", 0))
-        metrics.add_metric("AgentCycles", MetricUnit.Count,
-                           len(event.agent.metrics.agent_invocations[0].cycles))
-```
-Replaces guesswork about token costs with real per-request data in CloudWatch.
-
-**Hook C: Tool call limiter (runaway protection)**
-```python
-# SDK built-in pattern — use LimitToolCounts from hooks cookbook
-LimitToolCounts(max_tool_counts={"create_booking": 3, "retrieve": 10, "delete_booking": 2})
-```
-Cancels tool calls that exceed the per-request cap, preventing pathological agent loops from running up Bedrock costs. The SDK cookbook provides the full implementation.
-
-**Usage:**
-```python
-agent = Agent(
-    ...,
-    hooks=[CorrelationIdHook(), TokenMetricsHook(), LimitToolCounts(...)],
-)
-```
+**Note:** `AgentResult.metrics` API changed between doc authoring and implementation — `event.result.metrics` (not `event.agent.metrics`) is the correct path in `AfterInvocationEvent`.
 
 ---
 
@@ -251,13 +205,11 @@ Conceptual guidance; no code changes. Review the Strands Responsible AI docs onc
 - `cycle_durations`: list of seconds per agent loop cycle
 - `cycle_count`: total cycles for this invocation
 
-**What was implemented:** `TokenMetricsHook` in `app/hooks.py` reads `event.result.metrics` in `AfterInvocationEvent` and emits EMF metrics to CloudWatch — `InputTokens`, `OutputTokens`, `AgentCycles`. These produce time-series data in CloudWatch Metrics for dashboards and cost alarms.
+**What was implemented:** `TokenMetricsHook` in `app/agent/hooks.py` reads `event.result.metrics` in `AfterInvocationEvent` and:
+- emits EMF metrics (`InputTokens`, `OutputTokens`, `AgentCycles`) to CloudWatch
+- logs `agent_invocation_complete` structured entry per request
 
-**What remains — Structured Metrics Log Entry — `[HIGH]`**
-
-EMF metrics are aggregated (averages/sums over time). To answer per-request questions ("why did this specific session use 8 cycles?"), we need a structured log entry per invocation. This is the gap.
-
-**Plan:** Extend `TokenMetricsHook._emit()` to also call `logger.info()` with a structured summary:
+**Structured Metrics Log Entry — ✅ also implemented** (previously listed as remaining gap):
 
 ```python
 def _emit(self, event: AfterInvocationEvent) -> None:
@@ -324,84 +276,55 @@ fields @timestamp, correlation_id, stop_reason
 
 ---
 
-### Traces — Langfuse — `[MEDIUM]`
+### Traces — Langfuse — `[MEDIUM]` ✅ implemented
 
-**Decision: Langfuse Cloud.** Officially documented by Strands, LLM-specific UI (span hierarchy, token costs, latency per tool call), free tier, and naturally pairs with Ragas evals (Category 4). Data residency: Langfuse offers both EU (`cloud.langfuse.com`) and US (`us.cloud.langfuse.com`) regions.
+**Decision: Langfuse Cloud** over AWS-native OTEL. ADOT's new layer requires `AWS_LAMBDA_EXEC_WRAPPER=/opt/otel-instrument` which conflicts with LWA's `/opt/bootstrap`; Langfuse is officially documented by Strands with a working integration.
 
-**Why not AWS-native OTEL:**
-- New ADOT layer requires `AWS_LAMBDA_EXEC_WRAPPER=/opt/otel-instrument` — conflicts with LWA's `/opt/bootstrap`. Cannot set both.
-- Old ADOT Collector sidecar avoids the conflict but has no Strands-specific documentation; ARN must be guessed.
-- Strands' X-Ray section is a two-line pointer to external AWS docs — no working example exists.
+**What was implemented:**
 
-**Why Langfuse over Datadog:** Langfuse is purpose-built for LLM observability — prompt management, session grouping, eval score storage. Datadog is better if the team already has a Datadog subscription for the broader stack.
+`backend/pyproject.toml`: `strands-agents[otel]` extra
 
-**PII mitigation:**
-- `OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT=512` (already set in `infra/api.ts`) truncates raw message content in span attributes
-- `OTEL_TRACES_SAMPLER=traceidratio` + `OTEL_TRACES_SAMPLER_ARG=0.1` — export 10% of traces in production (reduces PII surface and cost)
-- Langfuse supports data masking rules in the UI for additional scrubbing
-
-**What to implement:**
-
-`backend/pyproject.toml`:
-```toml
-"strands-agents[otel]>=0.1.0",
-```
-
-`backend/app/main.py` (module level, Lambda-only):
+`backend/app/main.py` — Lambda-only, guarded on the OTLP endpoint being set (silent no-op in local dev and stages without the secret configured):
 ```python
-if _in_lambda:
+if _in_lambda and os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
     from strands.telemetry import StrandsTelemetry
     StrandsTelemetry().setup_otlp_exporter()
 ```
 
-`backend/app/api/routes/chat.py` — add to `Agent()`:
+`chat.py` — `trace_attributes` wired into `Agent()`:
 ```python
 trace_attributes={
     "session.id": request.session_id or get_correlation_id(),
-    "langfuse.tags": [$app.stage],  # "production" | "staging" etc.
+    "langfuse.tags": [APP_STAGE],
 }
 ```
 
-`infra/api.ts` — env vars for ChatFunction (store keys as SST secrets, not plaintext):
+`infra/api.ts` — env vars for ChatFunction (keys stored as SST secrets):
 ```typescript
-environment: {
-    // existing env vars...
-    OTEL_EXPORTER_OTLP_ENDPOINT: "https://us.cloud.langfuse.com/api/public/otel",
-    OTEL_EXPORTER_OTLP_HEADERS: langfuseAuthHeader.value,  // SST secret: "Authorization=Basic <base64(pk:sk)>"
-    OTEL_TRACES_SAMPLER: "traceidratio",
-    OTEL_TRACES_SAMPLER_ARG: $app.stage === "production" ? "0.1" : "1.0",
-}
+OTEL_EXPORTER_OTLP_ENDPOINT: "https://us.cloud.langfuse.com/api/public/otel",
+OTEL_EXPORTER_OTLP_HEADERS: langfuseAuthHeader.value,
+OTEL_ATTRIBUTE_VALUE_LENGTH_LIMIT: "512",   // PII truncation
+OTEL_TRACES_SAMPLER: "traceidratio",
+OTEL_TRACES_SAMPLER_ARG: $app.stage === "production" ? "0.1" : "1.0",
 ```
 
-**What you get in Langfuse:**
-- Full span tree per request: Agent → Cycle → Model invoke → Tool call
-- Token usage + latency per span
-- Session grouping by `session.id` — see full conversation as a timeline
-- Tag filtering by stage (`production` vs `staging`)
-- Eval score storage alongside traces (feeds Ragas results from Category 4)
+**What you get:** Full span tree (Agent → Cycle → Model → Tool), token usage + latency per span, session grouping by `session.id`, stage tag filtering.
 
 ---
 
-### X-Ray Agent Subsegment — `[LOW]`
+### X-Ray Agent Subsegment — `[LOW]` ✅ implemented
 
-**What we already have:** Powertools Tracer + `@tracer.capture_method` on `get_booking_details`, `create_booking`, `delete_booking` in `tools/bookings.py` — DynamoDB calls appear as X-Ray subsegments. The Powertools logger automatically includes `xray_trace_id` in every log entry, linking logs to traces.
-
-**What's missing:** The agent invocation itself (the 30–90s Bedrock loop) has no named subsegment in X-Ray. It appears as undifferentiated Lambda execution time.
-
-**Optional addition:** Wrap the `agent.stream_async()` call in a Powertools Tracer subsegment:
-
+**What was added:** `agent.stream_async()` is now wrapped in a named Powertools Tracer subsegment inside `generate_chat_events()`:
 ```python
-# chat.py — inside generate_chat_events()
 with tracer.provider.in_subsegment("## agent.stream") as subsegment:
     subsegment.put_annotation("session_id", request.session_id or "stateless")
     async with asyncio.timeout(MAX_AGENT_SECONDS):
         async for event in agent.stream_async(user_message):
             ...
 ```
+This makes the 30–90s Bedrock loop a named segment in X-Ray, distinguishing it from framework overhead. No new infrastructure — Powertools Tracer was already in deps.
 
-This adds an `agent.stream` subsegment to the X-Ray trace, making it clear how much of the Lambda duration is the Bedrock loop vs. framework overhead. No new infrastructure — Powertools Tracer is already in deps.
-
-**Why `[LOW]` and not higher:** The structured metrics log entry already provides per-request duration. X-Ray subsegments add value for visual service map analysis, but are not critical for a single-function agent.
+**Existing X-Ray coverage:** `@tracer.capture_method` on `get_booking_details`, `create_booking`, `delete_booking` in `tools/bookings.py` — DynamoDB calls are already X-Ray subsegments. Powertools logger includes `xray_trace_id` in every log line, linking logs to traces.
 
 ---
 
@@ -444,78 +367,20 @@ The Strands Evals SDK now provides a full evaluation surface with no external de
 
 ---
 
-### Strands Evals SDK — `[HIGH]`
+### Strands Evals SDK — `[HIGH]` ✅ implemented
 
-**Package:** `strands-evals` (separate from main backend deps — eval-only, never deployed to Lambda).
+**What was implemented:** Three eval files in `backend/tests/evals/`:
 
-**Test cases to build in `tests/evals/`:**
+- **`test_agent_evals.py`** — pytest-based suite (marked `@pytest.mark.agent`). Uses `FaithfulnessEvaluator` + `TrajectoryEvaluator` with Claude Haiku as judge. Runs via `pytest tests/evals/ -m agent`.
+- **`basic_eval.py`** — standalone script: faithfulness + goal success cases. Haiku as both agent and judge. Saves per-case scores/reasons as JSON to `tests/evals/experiment_files/` with timestamps.
+- **`trajectory_eval.py`** — standalone script: validates `retrieve → create_booking` and `get_booking_details → delete_booking` order. Uses deterministic mocked tool responses (canned `_FAKE_RESTAURANTS`, `_FAKE_BOOKING`) so trajectory scoring is repeatable without live KB calls. The `retrieve` tool is replaced by a `@strands_tool`-decorated stub (not `patch()`, which doesn't work once TOOLS already holds a reference to the real function).
 
-```python
-from strands import Agent
-from strands_evals import Case, Experiment
-from strands_evals.evaluators import (
-    FaithfulnessEvaluator,
-    TrajectoryEvaluator,
-    ToolSelectionAccuracyEvaluator,
-    GoalSuccessRateEvaluator,
-)
-from strands_evals.extractors import tools_use_extractor
-from strands_evals.mappers import StrandsInMemorySessionMapper
-from strands_evals.telemetry import StrandsEvalsTelemetry
-from strands_evals.types import TaskOutput
+**Key implementation decisions:**
+- Agent model for evals: **Haiku** (`us.anthropic.claude-3-5-haiku-20241022-v1:0`) — faster, cheaper, higher rate limits, sufficient for following booking rules
+- Judge model: **Haiku** — same reasoning, no meaningful accuracy loss for rubric scoring
+- `StrandsInMemorySessionMapper` / `StrandsEvalsTelemetry.setup_in_memory_exporter()` — no external service needed
 
-# Telemetry setup — in-memory exporter, no external service needed
-telemetry = StrandsEvalsTelemetry().setup_in_memory_exporter()
-memory_exporter = telemetry.in_memory_exporter
-
-trajectory_evaluator = TrajectoryEvaluator(
-    rubric="""
-    For booking requests: retrieve must come before create_booking.
-    For deletion requests: get_booking_details must come before delete_booking.
-    Score 1.0 if order is correct, 0.0 if any step is missing or reversed.
-    """
-)
-
-def run_agent(case: Case) -> TaskOutput:
-    memory_exporter.clear()
-    agent = Agent(
-        # ...model, tools, system_prompt from agent.py...
-        trace_attributes={
-            "gen_ai.conversation.id": case.session_id,
-            "session.id": case.session_id,
-        },
-        callback_handler=None,
-    )
-    response = agent(case.input)
-    trajectory = tools_use_extractor.extract_agent_tools_used_from_messages(agent.messages)
-    trajectory_evaluator.update_trajectory_description(
-        tools_use_extractor.extract_tools_description(agent)
-    )
-    mapper = StrandsInMemorySessionMapper()
-    session = mapper.map_to_session(memory_exporter.get_finished_spans(), session_id=case.session_id)
-    return TaskOutput(output=str(response), trajectory=session)
-
-test_cases = [
-    Case(name="kb-lookup", input="What restaurants are open on Sunday?"),
-    Case(name="booking-flow", input="Book a table for 2 at Nonna tomorrow at 7pm",
-         expected_trajectory=["retrieve", "create_booking"]),
-    Case(name="cancel-flow", input="Cancel booking B-123",
-         expected_trajectory=["get_booking_details", "delete_booking"]),
-]
-
-experiment = Experiment(
-    cases=test_cases,
-    evaluators=[
-        FaithfulnessEvaluator(),
-        trajectory_evaluator,
-        ToolSelectionAccuracyEvaluator(),
-        GoalSuccessRateEvaluator(),
-    ],
-)
-reports = experiment.run_evaluations(run_agent)
-```
-
-**CloudWatch integration:** Configure ADOT env vars (`AGENT_OBSERVABILITY_ENABLED=true`, `OTEL_METRICS_EXPORTER=awsemf`, etc.) when running evals in CI to publish scores to the **GenAI Observability: Bedrock AgentCore Observability** dashboard — no Langfuse account needed.
+**Note:** `StrandsInMemorySessionMapper` was referenced in original plan but the actual SDK trajectory extraction uses `tools_use_extractor.extract_agent_tools_used_from_messages(agent.messages)` directly — no in-memory telemetry span mapping needed for trajectory eval.
 
 ---
 
@@ -526,49 +391,39 @@ The original plan chose Ragas for RAG-specific faithfulness metrics (`faithfulne
 - `context_precision` is not practically measurable here — Bedrock KB retrieval scores are not exposed by the `retrieve` tool.
 - Langfuse traces (Category 3) are not yet implemented, so there is no existing Langfuse pipeline to "pair with".
 
-Revisit Ragas only if `context_precision` becomes measurable (requires surfacing KB retrieval scores) or if Langfuse becomes the single pane of glass for both traces and eval scores.
+Revisit Ragas only if `context_precision` becomes measurable (requires surfacing KB retrieval scores) or if Langfuse becomes the single pane of glass for both traces and eval scores. Langfuse is now implemented (Category 3) but the pipeline integration is not yet set up.
 
 ---
 
-### CI Integration — `[MEDIUM]`
+### CI Integration — `[MEDIUM]` ✅ implemented
 
-Add `.github/workflows/evals.yml` triggered **nightly or manually** (not on every push — Bedrock inference costs). Steps:
-1. Run `uv run pytest tests/evals/ -m agent` against a deployed staging stage
-2. Fail the workflow if any metric drops below threshold (e.g., faithfulness score < 0.75, trajectory pass rate < 0.9)
-3. Post scores as workflow summary annotations
-4. (Optional) Configure ADOT env vars to push scores to the CloudWatch AgentCore dashboard
+**What was implemented:** `.github/workflows/evals.yml` — nightly at 02:00 UTC + `workflow_dispatch` with stage input.
 
-Gate on the `agent` pytest marker already defined in `pyproject.toml`.
+Key details:
+- Runs `uv run pytest tests/evals/ -m agent -v` against a staging deployment
+- Injects minimal SST resource stubs via env vars so `config.py` imports without a live stack
+- Posts eval output as GitHub Actions step summary
+- `concurrency: group: evals-${{ github.ref }}` — cancels concurrent runs to protect shared Bedrock throttle budget
+- Only runs on `main` for scheduled triggers; `workflow_dispatch` can run on any branch
 
 ---
 
 ## Category 5 — Deployment
 
-### Operating Agents in Production checklist — `[IMMEDIATE]`
-
-Review against current codebase. Items already done are marked.
+### Operating Agents in Production checklist — `[IMMEDIATE]` ✅ complete
 
 | Checklist item | Status |
 |---|---|
-| Explicit tool list (no auto-loading) | ✅ Done — `tools=[...]` explicit in `agent.py` |
-| Model config explicit (temp, max_tokens, top_p) | ⚠️ Partial — model_id set; add `temperature`, `max_tokens` explicitly |
-| `SlidingWindowConversationManager` | ❌ Not yet — Phase 1 |
-| `ModelRetryStrategy` aligned with timeout | ❌ Not yet — Phase 1 |
+| Explicit tool list (no auto-loading) | ✅ Done — `tools=[...]` explicit in `agent/core.py` |
+| Model config explicit (model_id, thinking disabled, temperature, max_tokens, top_p) | ✅ Done — `temperature=0.3`, `max_tokens=4096`, `top_p=0.9` set in `agent/core.py` |
+| `SlidingWindowConversationManager` | ✅ Done — `chat.py`, `window_size=40, per_turn=True` |
+| `ModelRetryStrategy` aligned with timeout | ✅ Done — `max_attempts=3, max_delay=20` vs `asyncio.timeout(110s)` |
 | Error handling / fallback on agent error | ✅ Done — `finally: yield done` in `chat.py` |
 | Streaming via `stream_async()` | ✅ Done |
-| Token usage monitoring | ❌ Not yet — Phase 3 (hooks) |
-| Tool execution metrics | ❌ Not yet — Phase 3 (hooks) |
+| Token usage monitoring | ✅ Done — `TokenMetricsHook` (EMF + structured log) |
+| Tool execution metrics | ✅ Done — `TokenMetricsHook.tool_stats` per invocation |
 
-**One gap to close immediately:** Add explicit `temperature` and `max_tokens` to `BedrockModel` in `agent.py`. The docs recommend explicit config for production over relying on model defaults, which can change:
-```python
-model = BedrockModel(
-    model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
-    temperature=0.3,
-    max_tokens=4096,
-    additional_request_fields={"thinking": {"type": "disabled"}},
-    ...
-)
-```
+**Note on explicit model config:** Previously deferred, now set. The Strands production docs explicitly recommend explicit `temperature`/`max_tokens`/`top_p` so agent behavior doesn't silently shift if Bedrock updates provider defaults.
 
 ---
 
@@ -587,14 +442,36 @@ The official Strands Lambda layer exists (`arn:aws:lambda:us-east-1:856699698935
 
 ---
 
-## What This Codebase Already Has (Do Not Duplicate)
+## Post-Plan Structural Changes
+
+Changes made during implementation that weren't in the original plan:
+
+**`backend/app/agent/` package refactor (`eaca11c`):** `agent.py` was split into:
+- `agent/core.py` — `BedrockModel`, `RETRY_STRATEGY`, `TOOLS` module-level singletons
+- `agent/hooks.py` — `CorrelationIdHook`, `TokenMetricsHook`, `LimitToolCallsHook`
+- `agent/prompts.py` — `SYSTEM_PROMPT` constant
+
+**Bedrock guardrail infra fixes (`b9e36c1`):** Required fields (`blockedInputMessaging`, `blockedOutputsMessaging`) were missing from the initial `aws.bedrock.Guardrail` resource; added.
+
+**WAF removed (`e1b8224`):** `aws.wafv2.WebAclAssociation` is not supported on Lambda Function URLs — only ALB and CloudFront. WebACL was created but association silently fails. Removed from `infra/security.ts`.
+
+**60-day booking window + past-date validation (`c5eddb1`):** `SYSTEM_PROMPT` hardened with explicit booking constraints — no dates in the past, no dates more than 60 days out.
+
+**`restaurant_name` optional in `get_booking_details` (`0f8387e`):** Made optional in the tool signature; repository lookup falls back gracefully. Fixes cases where the agent omits it when it already has the booking ID.
+
+**`config.py` guardrail link guard (`835a0ba`):** Wrapped `Resource.RestaurantGuardrail` in `try/except` — the SST link is inactive when the guardrail resource is not deployed (staging without guardrail), preventing import errors.
+
+---
+
+## What This Codebase Has (Do Not Duplicate)
 
 | What | Where | Notes |
 |---|---|---|
-| `asyncio.timeout(110s)` | `chat.py` | Phase 1 / Retry Strategies aligns with this |
-| Lambda Powertools Logger | `app/logging.py` | JSON, cold_start, correlation IDs — keep |
+| `asyncio.timeout(110s)` | `chat.py` | Aligned with `ModelRetryStrategy.max_delay=20` |
+| Lambda Powertools Logger | `app/logging.py` | JSON, `cold_start`, `xray_trace_id`, correlation ID — keep |
 | Lambda Powertools Metrics | `app/metrics.py` | `ChatRequest`, `AgentError`, `BookingCreated` — extend, don't replace |
-| Lambda Powertools Tracer | `tools/bookings.py` | `@tracer.capture_method` on tool functions — keep for DynamoDB subsegments |
-| `GUARDRAIL_ID` / `GUARDRAIL_VERSION` stubs | `config.py`, `agent.py` | Code path correct; just needs the resource (Category 2) |
-| Pydantic input validation | `models/schemas.py` | Complementary to prompt hardening; no duplication |
-| `force_stop` detection | `chat.py` | Emits error + done event; verify it handles guardrail block events too |
+| Lambda Powertools Tracer | `app/tracer.py`, `tools/bookings.py` | DynamoDB subsegments + `agent.stream` subsegment |
+| `GUARDRAIL_ID` / `GUARDRAIL_VERSION` | `config.py`, `agent/core.py` | Injected via SST link; omitted gracefully in local dev |
+| `_PiiRedactionFilter` | `app/logging.py` | Regex filter on root + Powertools logger; scrubs email/phone |
+| Pydantic input validation | `models/schemas.py` | API boundary validation — complementary to prompt hardening |
+| `force_stop` detection | `chat.py` | Covers guardrail interventions (`stop_reason="guardrail_intervened"`) |
