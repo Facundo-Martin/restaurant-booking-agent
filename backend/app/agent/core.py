@@ -49,6 +49,13 @@ RETRY_STRATEGY = ModelRetryStrategy(
 # Leave unset in local dev; configure via SST link once a guardrail is deployed.
 model = BedrockModel(
     model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+    # Explicit config — avoids silent behavior changes if Bedrock updates defaults.
+    # temperature=0.3: deterministic enough for booking tasks, avoids creative drift.
+    # max_tokens=4096: generous cap for tool-heavy turns; booking responses are short.
+    # top_p=0.9: slight nucleus sampling reduction from default 1.0.
+    temperature=0.3,
+    max_tokens=4096,
+    top_p=0.9,
     additional_request_fields={"thinking": {"type": "disabled"}},
     **(
         {
