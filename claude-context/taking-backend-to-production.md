@@ -624,7 +624,11 @@ def test_health_degraded():
 
 **What changed:** a new `infra/security.ts` module creates a single REGIONAL WAF WebACL and associates it with both entry points. Zero application code changes.
 
-### 12a. WAF on the API Gateway ✅
+### 12a. WAF on the API Gateway ❌ (removed)
+
+> **Correction:** `aws.wafv2.WebAclAssociation` does NOT support API Gateway HTTP API (v2) stages. WAF only supports REST API (v1) stage ARNs (`/restapis/{id}/stages/{stage}`). Attaching to an HTTP API ARN (`/apis/{id}/stages/$default`) fails at deploy time with `WAFInvalidParameterException`. The `ApiGatewayWafAssociation` resource was removed from `infra/security.ts`. WAF is attached only to the Function URL (Section 12b), which IS supported.
+
+### 12a-removed. (was: WAF on the API Gateway)
 
 `infra/security.ts` — `aws.wafv2.WebAcl` with two rules, associated with the API Gateway `$default` stage ARN via `api.nodes.stage.arn` (exported from `infra/api.ts`):
 
