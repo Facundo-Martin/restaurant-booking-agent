@@ -198,6 +198,7 @@ sst.Linkable.wrap(aws.bedrock.AgentKnowledgeBase, (kb) => ({
 // offending message in conversation history; the existing force_stop handler in chat.py covers it.
 const guardrail = new aws.bedrock.Guardrail("RestaurantGuardrail", {
   name: `${$app.name}-${$app.stage}`,
+  description: "Guardrail for the restaurant booking assistant.",
   blockedInputMessaging: "I can only help with restaurant discovery and bookings.",
   blockedOutputsMessaging: "I can only help with restaurant discovery and bookings.",
   topicPolicyConfig: {
@@ -205,6 +206,11 @@ const guardrail = new aws.bedrock.Guardrail("RestaurantGuardrail", {
       {
         name: "off-topic",
         definition: "Any topic unrelated to restaurant discovery, menus, or table reservations.",
+        examples: [
+          "What is the weather like today?",
+          "Write me a Python script.",
+          "Tell me a joke.",
+        ],
         type: "DENY",
       },
     ],
