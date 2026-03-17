@@ -30,7 +30,7 @@ backend/sst.pyi
 apps/web/lib/client/
 
 # evals output
-backend/experiment_files/
+backend/tests/evals/experiment_files/
 
 # misc
 .DS_Store

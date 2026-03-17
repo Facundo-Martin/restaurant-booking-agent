@@ -2,8 +2,10 @@
 # Run from the backend/ directory:
 #   PYTHONPATH=. uv run python -u tests/evals/trajectory_eval.py
 import asyncio
+import json
 import sys
 from datetime import datetime
+from pathlib import Path
 
 from strands import Agent
 from strands.models import BedrockModel
@@ -91,6 +93,48 @@ evaluator.update_trajectory_description(
 _PASS_THRESHOLD = 0.85  # Fail CI if fewer than 85% of cases pass
 
 
+def _save_report(experiment: object, report: object, ts: str, name: str) -> Path:
+    """Save a rich JSON with per-case scores, reasons, and summary statistics.
+
+    EvaluationReport exposes parallel lists (scores, test_passes, reasons) that
+    align positionally with experiment.cases — zip them to produce per-case rows.
+    """
+    case_results = [
+        {
+            "name": case.name,
+            "input": case.input,
+            "expected_trajectory": case.expected_trajectory,
+            "score": score,
+            "test_pass": test_pass,
+            "reason": reason,
+            "metadata": case.metadata,
+        }
+        for case, score, test_pass, reason in zip(
+            experiment.cases,
+            report.scores,
+            report.test_passes,
+            report.reasons,
+            strict=True,
+        )
+    ]
+
+    passed = sum(1 for r in case_results if r["test_pass"])
+    data = {
+        "timestamp": ts,
+        "overall_score": report.overall_score,
+        "pass_rate": passed / len(case_results),
+        "cases_passed": passed,
+        "cases_total": len(case_results),
+        "case_results": case_results,
+    }
+
+    out_dir = Path("tests/evals/experiment_files")
+    out_dir.mkdir(exist_ok=True)
+    out_path = out_dir / f"{name}_{ts}.json"
+    out_path.write_text(json.dumps(data, indent=2))
+    return out_path
+
+
 async def main() -> None:
     experiment = Experiment[str, str](cases=test_cases, evaluators=[evaluator])
     print(f"Running {len(test_cases)} cases concurrently ...", flush=True)
@@ -102,12 +146,12 @@ async def main() -> None:
     report.run_display()
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    experiment.to_file(f"trajectory_evaluation_{ts}")
-    print(f"\nExperiment saved to ./experiment_files/trajectory_evaluation_{ts}.json")
+    out_path = _save_report(experiment, report, ts, "trajectory_evaluation")
+    print(f"\nResults saved to {out_path}")
 
-    passed = sum(1 for r in report.results if r.test_pass)
-    pass_rate = passed / len(report.results)
-    print(f"\nPass rate: {passed}/{len(report.results)} ({pass_rate:.0%})")
+    passed = sum(1 for p in report.test_passes if p)
+    pass_rate = passed / len(report.test_passes)
+    print(f"\nPass rate: {passed}/{len(report.test_passes)} ({pass_rate:.0%})")
     if pass_rate < _PASS_THRESHOLD:
         print(
             f"ERROR: pass rate {pass_rate:.0%} is below threshold {_PASS_THRESHOLD:.0%}",
