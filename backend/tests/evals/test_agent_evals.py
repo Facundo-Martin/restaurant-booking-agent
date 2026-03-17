@@ -11,9 +11,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from strands import Agent
+from strands import tool as strands_tool
 from strands_evals import Case, Experiment
 from strands_evals.evaluators import OutputEvaluator, TrajectoryEvaluator
 from strands_evals.extractors import tools_use_extractor
+from strands_tools import retrieve as _real_retrieve
 
 from app.agent.core import SYSTEM_PROMPT, TOOLS, model
 
@@ -26,6 +28,16 @@ _FAKE_RESTAURANTS = (
     "Available restaurants: Nonna's Hearth (Italian, open daily, accepts reservations), "
     "Bistro Parisienne (French, closed Mondays, accepts reservations)."
 )
+
+
+# See trajectory_eval.py for why we build a @tool-decorated stub instead of patching the module.
+@strands_tool
+def retrieve(query: str) -> str:
+    """Search the knowledge base for restaurants, menus, and availability."""
+    return _FAKE_RESTAURANTS
+
+
+_EVAL_TOOLS = [retrieve if t is _real_retrieve else t for t in TOOLS]
 
 
 # ---------------------------------------------------------------------------
@@ -55,15 +67,12 @@ def _run_agent(case: Case) -> dict:
 
     agent = Agent(
         model=model,
-        tools=TOOLS,
+        tools=_EVAL_TOOLS,
         system_prompt=SYSTEM_PROMPT,
         callback_handler=None,
     )
 
-    with (
-        patch("strands_tools.retrieve", MagicMock(return_value=_FAKE_RESTAURANTS)),
-        patch("app.tools.bookings.booking_repo", mock_repo),
-    ):
+    with patch("app.tools.bookings.booking_repo", mock_repo):
         response = agent(case.input)
 
     trajectory = tools_use_extractor.extract_agent_tools_used_from_messages(
@@ -128,7 +137,7 @@ def test_tool_trajectory():
     )
 
     # Seed the evaluator with tool descriptions to prevent context overflow
-    sample_agent = Agent(tools=TOOLS, callback_handler=None)
+    sample_agent = Agent(tools=_EVAL_TOOLS, callback_handler=None)
     evaluator.update_trajectory_description(
         tools_use_extractor.extract_tools_description(sample_agent, is_short=True)
     )

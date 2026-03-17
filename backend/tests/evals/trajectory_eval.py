@@ -6,14 +6,24 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch  # MagicMock used for booking_repo mock
 
 from strands import Agent
+from strands import tool as strands_tool
+from strands.models import BedrockModel
 from strands_evals import Case, Experiment
 from strands_evals.evaluators import TrajectoryEvaluator
 from strands_evals.extractors import tools_use_extractor
+from strands_tools import retrieve as _real_retrieve
 
-from app.agent.core import SYSTEM_PROMPT, TOOLS, model
+from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS
+
+# Haiku is fast, cheap, and has higher rate limits than Sonnet — more than capable of
+# following the system prompt rules for tool routing. We don't need Sonnet quality here.
+_AGENT_MODEL = BedrockModel(
+    model_id="us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    additional_request_fields={"thinking": {"type": "disabled"}},
+)
 
 # Canned responses — deterministic inputs for consistent trajectory scoring
 _FAKE_RESTAURANTS = (
@@ -34,6 +44,19 @@ _FAKE_BOOKING = {
 _JUDGE_MODEL = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 
 
+# Fake retrieve tool — patch("strands_tools.retrieve", ...) doesn't work because TOOLS
+# already holds a reference to the real retrieve object. Instead we build a Strands-compatible
+# @tool-decorated replacement and substitute it into the tools list so the agent calls our
+# deterministic stub rather than making real Bedrock Knowledge Base calls during evals.
+@strands_tool
+def retrieve(query: str) -> str:
+    """Search the knowledge base for restaurants, menus, and availability."""
+    return _FAKE_RESTAURANTS
+
+
+_EVAL_TOOLS = [retrieve if t is _real_retrieve else t for t in TOOLS]
+
+
 # Define async task function — cases run concurrently via run_evaluations_async
 async def get_response_with_tools(case: Case) -> dict:
     print(f"  Running case: {case.name!r} ...", flush=True)
@@ -46,16 +69,14 @@ async def get_response_with_tools(case: Case) -> dict:
     mock_repo.delete.return_value = True
 
     agent = Agent(
-        model=model,
-        tools=TOOLS,
+        model=_AGENT_MODEL,
+        tools=_EVAL_TOOLS,
         system_prompt=SYSTEM_PROMPT,
         callback_handler=None,
+        retry_strategy=RETRY_STRATEGY,
     )
 
-    with (
-        patch("strands_tools.retrieve", MagicMock(return_value=_FAKE_RESTAURANTS)),
-        patch("app.tools.bookings.booking_repo", mock_repo),
-    ):
+    with patch("app.tools.bookings.booking_repo", mock_repo):
         response = await agent.invoke_async(case.input)
 
     trajectory = tools_use_extractor.extract_agent_tools_used_from_messages(
@@ -144,7 +165,7 @@ evaluator = TrajectoryEvaluator(
 )
 
 # Seed the evaluator with tool descriptions to prevent context overflow
-sample_agent = Agent(model=model, tools=TOOLS, callback_handler=None)
+sample_agent = Agent(model=_AGENT_MODEL, tools=_EVAL_TOOLS, callback_handler=None)
 evaluator.update_trajectory_description(
     tools_use_extractor.extract_tools_description(sample_agent, is_short=True)
 )
@@ -196,8 +217,18 @@ def _save_report(experiment: object, report: object, ts: str, name: str) -> Path
 
 async def main() -> None:
     experiment = Experiment[str, str](cases=test_cases, evaluators=[evaluator])
-    print(f"Running {len(test_cases)} cases concurrently ...", flush=True)
-    reports = await experiment.run_evaluations_async(get_response_with_tools)
+
+    # Each agent turn is a separate converse_stream call, so even a few concurrent
+    # cases can saturate rate limits. Haiku handles concurrency well but a small cap
+    # keeps us safely under the limit.
+    _sem = asyncio.Semaphore(2)
+
+    async def _rate_limited(case: Case) -> dict:
+        async with _sem:
+            return await get_response_with_tools(case)
+
+    print(f"Running {len(test_cases)} cases (max 2 concurrent) ...", flush=True)
+    reports = await experiment.run_evaluations_async(_rate_limited)
     print("Evaluations complete. Generating report ...", flush=True)
 
     print("=== Tool Trajectory Evaluation Results ===")
