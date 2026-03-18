@@ -7,24 +7,17 @@ chat.py to prevent conversation history from leaking between users.
 
 import os
 
+from strands import ModelRetryStrategy
 from strands.models import BedrockModel
 from strands_tools import current_time, retrieve
 
+from app.agent.prompts import SYSTEM_PROMPT
 from app.config import GUARDRAIL_ID, GUARDRAIL_VERSION, KB_ID
 from app.tools.bookings import create_booking, delete_booking, get_booking_details
 
 # The retrieve tool reads KNOWLEDGE_BASE_ID from the environment.
 # Set once at module load so it's available before the first agent is created.
 os.environ["KNOWLEDGE_BASE_ID"] = KB_ID
-
-SYSTEM_PROMPT = """You are a helpful restaurant booking assistant. You help users:
-- Discover restaurants and browse menus using your knowledge base
-- Make, view, and cancel reservations
-
-Always confirm booking details with the user before creating a reservation.
-When a user asks about restaurants or menus, use the retrieve tool to search
-the knowledge base. Use current_time when date context is needed.
-"""
 
 # boto3 retry configuration — set via environment variables so they apply to
 # every boto3 client Strands creates internally (BedrockModel, retrieve tool).
@@ -37,6 +30,16 @@ the knowledge base. Use current_time when date context is needed.
 os.environ.setdefault("AWS_RETRY_MODE", "standard")
 os.environ.setdefault("AWS_MAX_ATTEMPTS", "3")
 
+# Strands-level retry for ModelThrottledException (rate limits).
+# Default is 6 total attempts with 4s initial delay — worst case 124s, which
+# exceeds the 110s asyncio.timeout in chat.py and prevents the clean SSE done event.
+# Aligned with AWS_MAX_ATTEMPTS=3; worst-case wait: 2+4+20 = 26s.
+RETRY_STRATEGY = ModelRetryStrategy(
+    max_attempts=3,  # 1 initial + 2 retries — matches AWS_MAX_ATTEMPTS
+    initial_delay=2,
+    max_delay=20,  # caps exponential growth well within the 110s timeout budget
+)
+
 # Cached at module level — BedrockModel is stateless (no conversation state).
 # Creating it once per cold start avoids repeated credential resolution overhead.
 #
@@ -46,6 +49,13 @@ os.environ.setdefault("AWS_MAX_ATTEMPTS", "3")
 # Leave unset in local dev; configure via SST link once a guardrail is deployed.
 model = BedrockModel(
     model_id="us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+    # Explicit config — avoids silent behavior changes if Bedrock updates defaults.
+    # temperature=0.3: deterministic enough for booking tasks, avoids creative drift.
+    # max_tokens=4096: generous cap for tool-heavy turns; booking responses are short.
+    # top_p=0.9: slight nucleus sampling reduction from default 1.0.
+    temperature=0.3,
+    max_tokens=4096,
+    top_p=0.9,
     additional_request_fields={"thinking": {"type": "disabled"}},
     **(
         {
@@ -60,3 +70,5 @@ model = BedrockModel(
 
 # All tools available to the agent — stateless, safe to share across requests.
 TOOLS = [retrieve, current_time, get_booking_details, create_booking, delete_booking]
+
+__all__ = ["SYSTEM_PROMPT", "RETRY_STRATEGY", "model", "TOOLS"]

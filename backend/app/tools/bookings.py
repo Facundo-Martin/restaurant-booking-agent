@@ -9,12 +9,12 @@ from app.tracer import tracer
 
 @tool
 @tracer.capture_method
-def get_booking_details(booking_id: str, restaurant_name: str) -> dict:
+def get_booking_details(booking_id: str, restaurant_name: str | None = None) -> dict:
     """Get the details of an existing booking.
 
     Args:
         booking_id: The unique booking identifier.
-        restaurant_name: The name of the restaurant.
+        restaurant_name: The name of the restaurant (optional — omit if unknown).
 
     Returns:
         The booking details, or a message if not found.

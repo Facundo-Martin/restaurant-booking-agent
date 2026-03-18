@@ -12,4 +12,8 @@ from unittest.mock import MagicMock
 _mock_sst = MagicMock()
 _mock_sst.Resource.Bookings.name = "test-bookings-table"
 _mock_sst.Resource.RestaurantKB.id = "test-kb-id"
+_mock_sst.Resource.AgentSessions.name = "test-sessions-bucket"
+# Set to None so GUARDRAIL_ID resolves to None — prevents BedrockModel from
+# being constructed with a MagicMock guardrail ID that would fail Bedrock calls.
+_mock_sst.Resource.RestaurantGuardrail = None
 sys.modules["sst"] = _mock_sst

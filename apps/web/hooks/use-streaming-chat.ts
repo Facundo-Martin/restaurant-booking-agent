@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import type { ChatMessage, SSEEvent, ToolInvocation } from '@/lib/types'
 import type { ChatApiMessage } from '@/lib/api'
 
@@ -29,11 +29,23 @@ function newId() {
  * Consumes standard SSE from any backend (FastAPI, Express, etc.)
  * and builds a ChatMessage[] array with text and tool-invocation parts.
  */
+const SESSION_STORAGE_KEY = 'chat-session-id'
+
 export function useStreamingChat({ api }: UseStreamingChatOptions): UseStreamingChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [status, setStatus] = useState<'ready' | 'streaming' | 'error'>('ready')
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // Session ID is persisted in localStorage so conversation history survives page refreshes.
+  // The backend's S3SessionManager uses it to restore the Strands agent's full history.
+  const sessionIdRef = useRef<string>('')
+
+  useEffect(() => {
+    const stored = localStorage.getItem(SESSION_STORAGE_KEY)
+    const id = stored ?? crypto.randomUUID()
+    if (!stored) localStorage.setItem(SESSION_STORAGE_KEY, id)
+    sessionIdRef.current = id
+  }, [])
 
   const stop = useCallback(() => {
     abortRef.current?.abort()
@@ -45,6 +57,10 @@ export function useStreamingChat({ api }: UseStreamingChatOptions): UseStreaming
     stop()
     setMessages([])
     setError(null)
+    // Start a new session so the backend discards S3 history for the old one
+    const id = crypto.randomUUID()
+    localStorage.setItem(SESSION_STORAGE_KEY, id)
+    sessionIdRef.current = id
   }, [stop])
 
   const sendMessage = useCallback(
@@ -73,19 +89,25 @@ export function useStreamingChat({ api }: UseStreamingChatOptions): UseStreaming
       abortRef.current = controller
 
       try {
-        // Build history for context (exclude the in-progress assistant message)
-        const history: ChatApiMessage[] = [...messages, userMsg].map((m) => ({
-          role: m.role,
-          content: m.parts
-            .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
-            .map((p) => p.text)
-            .join(''),
-        }))
+        // When a session_id is present the backend restores full history from S3,
+        // so we only need to send the new user message. Stateless fallback sends
+        // the full history (legacy clients / one-off queries without a session).
+        const payload: { messages: ChatApiMessage[]; session_id?: string } = sessionIdRef.current
+          ? { messages: [{ role: 'user', content: text }], session_id: sessionIdRef.current }
+          : {
+              messages: [...messages, userMsg].map((m) => ({
+                role: m.role,
+                content: m.parts
+                  .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+                  .map((p) => p.text)
+                  .join(''),
+              })),
+            }
 
         const response = await fetch(api, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: history }),
+          body: JSON.stringify(payload),
           signal: controller.signal,
         })
 

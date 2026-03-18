@@ -43,6 +43,16 @@ class ChatApiRequest(BaseModel):
         max_length=CHAT_MAX_MESSAGES,
         description="Conversation history. Maximum 50 messages.",
     )
+    session_id: str | None = Field(
+        default=None,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_-]+$",
+        description=(
+            "Opaque session identifier (UUID recommended). When provided, the agent "
+            "restores conversation history from S3 — send only the new user message "
+            "in `messages`. When absent, the agent is stateless."
+        ),
+    )
 
 
 class Booking(BaseModel):

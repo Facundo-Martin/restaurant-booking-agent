@@ -9,6 +9,7 @@ from sst import Resource
 # that SST populated during deployment.
 TABLE_NAME: str = Resource.Bookings.name  # type: ignore[attr-defined]
 KB_ID: str = Resource.RestaurantKB.id  # type: ignore[attr-defined]
+SESSIONS_BUCKET: str = Resource.AgentSessions.name  # type: ignore[attr-defined]
 
 # Input validation limits — tune here without touching the schema definitions.
 CHAT_MAX_MESSAGE_LENGTH: int = 4096  # characters per individual message
@@ -22,10 +23,18 @@ BOOKING_MAX_SPECIAL_REQUESTS_LENGTH: int = 500
 # so a timeout is necessary even with retries in place.
 MAX_AGENT_SECONDS: int = 110
 
-# Bedrock Guardrail — optional. When set, the guardrail is evaluated on every
-# model invocation before the response reaches the agent. Leave unset in dev/test;
-# set via SST link once a guardrail is deployed (see infra/ai.ts).
-# BEDROCK_GUARDRAIL_VERSION defaults to "DRAFT" so the latest saved version is
-# used automatically during the guardrail authoring phase.
-GUARDRAIL_ID: str | None = os.environ.get("BEDROCK_GUARDRAIL_ID")
-GUARDRAIL_VERSION: str = os.environ.get("BEDROCK_GUARDRAIL_VERSION", "DRAFT")
+# Bedrock Guardrail — injected via SST link from infra/ai.ts (RestaurantGuardrail).
+# GUARDRAIL_VERSION is the published version string; "DRAFT" uses the latest saved draft,
+# which is fine during authoring. Pin to "1" (or higher) for production deployments.
+# Falls back to env vars so local uvicorn runs without a linked guardrail still work.
+# getattr() cannot be used here — SST raises Exception (not AttributeError) when links
+# are inactive, bypassing getattr's default. A try/except is required.
+try:
+    GUARDRAIL_ID: str | None = Resource.RestaurantGuardrail.id  # type: ignore[attr-defined]
+    GUARDRAIL_VERSION: str = Resource.RestaurantGuardrail.version  # type: ignore[attr-defined]
+except Exception:  # pylint: disable=broad-exception-caught
+    GUARDRAIL_ID = os.environ.get("BEDROCK_GUARDRAIL_ID")
+    GUARDRAIL_VERSION = os.environ.get("BEDROCK_GUARDRAIL_VERSION", "DRAFT")
+
+# Stage name — injected by SST at deploy time via APP_STAGE env var; falls back to "dev" locally.
+APP_STAGE: str = os.environ.get("APP_STAGE", "dev")

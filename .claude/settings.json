@@ -9,8 +9,20 @@
   "permissions": {
     "allow": [
       "WebFetch",
+      "WebSearch",
       "Bash(gh *)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(aws *)",
+      "Bash(cd '/Users/facundo/Desktop/Software      Engineer/Agentic AI/Projects/restaurant-booking-agent*')",
+      "Bash(cd \"/Users/facundo/Desktop/Software      Engineer/Agentic AI/Projects/restaurant-booking-agent*\")",
+      "mcp__strands__fetch_doc",
+      "mcp__strands__search_docs",
+      "mcp__ide__getDiagnostics",
+      "mcp__plugin_aws-cost-ops_pricing__get_pricing_service_codes",
+      "mcp__plugin_aws-cost-ops_pricing__get_pricing_service_attributes",
+      "mcp__plugin_aws-cdk_cdk__CDKGeneralGuidance",
+      "Skill(aws-serverless-eda)",
+      "Skill(serverless-eda:aws-serverless-eda)"
     ]
   }
 }

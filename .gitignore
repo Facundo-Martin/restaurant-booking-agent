@@ -29,5 +29,8 @@ backend/sst.pyi
 # generated
 apps/web/lib/client/
 
+# evals output
+backend/tests/evals/experiment_files/
+
 # misc
 .DS_Store

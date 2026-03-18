@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from strands import Agent
 
-from app.agent import SYSTEM_PROMPT, TOOLS, model
+from app.agent.core import SYSTEM_PROMPT, TOOLS, model
 
 pytestmark = pytest.mark.agent
 
