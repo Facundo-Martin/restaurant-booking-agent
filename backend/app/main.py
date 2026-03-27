@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 
+from app import instrumentation
 from app.api.routes import bookings, chat
 from app.exceptions import AppException
 from app.logging import logger
@@ -25,15 +26,7 @@ from app.repositories import bookings as booking_repo
 # The TypeScript client is regenerated from a local dev server instead.
 _in_lambda = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
 
-# Enable Strands OTLP telemetry (Langfuse) only when running in Lambda and the
-# endpoint is configured. Guarding on the endpoint means local dev and staging
-# deployments without a Langfuse secret set will skip telemetry silently.
-if _in_lambda and os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"):
-    from strands.telemetry import (
-        StrandsTelemetry,  # pylint: disable=import-outside-toplevel
-    )
-
-    StrandsTelemetry().setup_otlp_exporter()
+instrumentation.setup()
 
 app = FastAPI(
     title="Restaurant Booking Agent",

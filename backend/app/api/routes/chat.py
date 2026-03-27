@@ -2,7 +2,9 @@
 
 import asyncio
 import json
+import os
 from collections.abc import AsyncGenerator
+from contextlib import nullcontext
 from typing import Any
 
 from fastapi import APIRouter
@@ -13,7 +15,8 @@ from strands.session import S3SessionManager
 
 from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
 from app.agent.hooks import CorrelationIdHook, LimitToolCallsHook, TokenMetricsHook
-from app.config import APP_STAGE, MAX_AGENT_SECONDS, SESSIONS_BUCKET
+from app.config import MAX_AGENT_SECONDS, SESSIONS_BUCKET
+from app.instrumentation import flush as flush_traces
 from app.logging import logger
 from app.metrics import MetricUnit, metrics
 from app.middleware import get_correlation_id
@@ -78,15 +81,25 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
         session_manager=session_manager,
         trace_attributes={
             "session.id": request.session_id or get_correlation_id(),
-            "langfuse.tags": [APP_STAGE],
+            "user.id": request.session_id or "anonymous",
         },
     )
     # Maps toolUseId → toolName so tool-result events can include the name.
     tool_names: dict[str, str] = {}
 
+    _in_lambda = bool(os.environ.get("AWS_LAMBDA_FUNCTION_NAME"))
+    _subsegment_ctx = (
+        tracer.provider.in_subsegment("## agent.stream")
+        if _in_lambda
+        else nullcontext()
+    )
+
     try:
-        with tracer.provider.in_subsegment("## agent.stream") as subsegment:
-            subsegment.put_annotation("session_id", request.session_id or "stateless")
+        with _subsegment_ctx as subsegment:
+            if subsegment:
+                subsegment.put_annotation(
+                    "session_id", request.session_id or "stateless"
+                )
             async with asyncio.timeout(MAX_AGENT_SECONDS):
                 agent_stream = agent.stream_async(user_message)
                 async for event in agent_stream:
@@ -220,9 +233,10 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
             data=json.dumps({"type": "error", "error": "An unexpected error occurred."})
         )
     finally:
-        # Flush EMF metrics manually — the chat Lambda runs under LWA+uvicorn so
-        # @metrics.log_metrics never executes; the generator finally block is the
-        # only reliable flush point for every request.
+        # Flush both trace spans and EMF metrics before the response closes.
+        # The chat Lambda runs under LWA+uvicorn so @metrics.log_metrics never
+        # executes; the generator finally block is the only reliable flush point.
+        flush_traces()
         metrics.flush_metrics()
         yield ServerSentEvent(data=json.dumps({"type": "done"}))
 
