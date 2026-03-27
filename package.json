@@ -1,10 +1,11 @@
 {
   "name": "restaurant-booking-agent",
   "private": true,
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev": "sst dev",
-    "api": "sst shell -- sh -c 'cd backend && uv run uvicorn app.main:app --reload'",
+    "dev:api": "sst shell -- sh -c 'cd backend && uv run uvicorn app.main:app --reload'",
     "deploy": "sst deploy --stage dev",
     "deploy:prod": "sst deploy --stage production",
     "remove:dev": "sst remove",
@@ -13,16 +14,16 @@
     "lint": "turbo run lint"
   },
   "devDependencies": {
-    "@tsconfig/node22": "^22",
+    "@tsconfig/node22": "^22.0.5",
     "concurrently": "^9.2.1",
-    "turbo": "^2.8.10",
-    "typescript": "^5"
+    "turbo": "^2.8.20",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock-agent-runtime": "^3.995.0",
-    "@aws-sdk/client-rds": "^3.996.0",
-    "@aws-sdk/client-rds-data": "^3.996.0",
-    "@pulumi/command": "^1.2.0",
-    "sst": "^3.18.12"
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.1018.0",
+    "@aws-sdk/client-rds": "^3.1018.0",
+    "@aws-sdk/client-rds-data": "^3.1018.0",
+    "@pulumi/command": "^1.2.1",
+    "sst": "^3.19.3"
   }
 }

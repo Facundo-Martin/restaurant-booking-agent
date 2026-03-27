@@ -1,3 +1,5 @@
 packages:
   - "apps/*"
   # backend/ is intentionally excluded — Python is managed by uv, not pnpm
+
+useNodeVersion: "24.14.1"
