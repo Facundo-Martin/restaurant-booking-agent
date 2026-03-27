@@ -2,4 +2,10 @@ packages:
   - "apps/*"
   # backend/ is intentionally excluded — Python is managed by uv, not pnpm
 
+allowBuilds:
+  '@pulumi/command': true
+  aws-sdk: true
+  protobufjs: true
+  sharp: true
+  unrs-resolver: true
 useNodeVersion: "24.14.1"
