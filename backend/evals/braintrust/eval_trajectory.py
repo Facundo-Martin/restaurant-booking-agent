@@ -53,6 +53,7 @@ def retrieve(query: str) -> str:
     return _FAKE_RESTAURANTS
 
 
+# Replace the real retrieve in the tool list with the deterministic stub.
 _EVAL_TOOLS = [retrieve if t is _real_retrieve else t for t in TOOLS]
 
 

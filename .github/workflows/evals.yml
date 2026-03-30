@@ -1,18 +1,22 @@
 name: Evals
 
 on:
-  schedule:
-    # Run nightly at 02:00 UTC — avoids peak Bedrock throttle windows
-    - cron: "0 2 * * *"
+  # Run on every PR targeting main — catches regressions before merge.
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+  # Run on push to main — establishes the new baseline experiment in Braintrust
+  # that future PRs are compared against.
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+  # Manual trigger for ad-hoc runs (e.g. after a prompt or model change).
   workflow_dispatch:
-    inputs:
-      stage:
-        description: "SST stage to run evals against (default: staging)"
-        required: false
-        default: staging
 
-# Prevent concurrent eval runs — Bedrock inference costs money and concurrent
-# runs on the same stage share a throttle budget.
+# One concurrent run per branch/PR — cancels a stale run if a new commit is
+# pushed before the previous run finishes.
 concurrency:
   group: evals-${{ github.ref }}
   cancel-in-progress: true
@@ -21,8 +25,10 @@ jobs:
   evals:
     name: Agent Evals
     runs-on: ubuntu-latest
-    # Only run on the main branch for scheduled runs; workflow_dispatch can run anywhere.
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      # Needed for Braintrust to post experiment results as a PR comment.
+      pull-requests: write
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -46,15 +52,47 @@ jobs:
         run: uv sync --frozen --group dev
         working-directory: backend
 
-      - name: Run agent evals
-        id: evals
-        run: uv run pytest tests/evals/ -m agent -v --tb=short 2>&1 | tee /tmp/eval-results.txt
+      # -----------------------------------------------------------------------
+      # Step 1 — Strands Evals (local, no platform dependency)
+      # Runs the existing pytest-based evals. These work without a Braintrust
+      # API key and save results to experiment_files/ for local inspection.
+      # -----------------------------------------------------------------------
+      - name: Run Strands agent evals
+        id: strands-evals
+        run: uv run pytest tests/evals/ -m agent -v --tb=short 2>&1 | tee /tmp/strands-eval-results.txt
         working-directory: backend
 
-      - name: Post eval summary
+      - name: Post Strands eval summary
         if: always()
         run: |
-          echo "## Agent Eval Results" >> $GITHUB_STEP_SUMMARY
+          echo "## Strands Agent Eval Results" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          cat /tmp/eval-results.txt >> $GITHUB_STEP_SUMMARY
+          cat /tmp/strands-eval-results.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      # -----------------------------------------------------------------------
+      # Step 2 — Braintrust Evals (platform-tracked, experiment comparison)
+      # Pushes results to Braintrust for diff-against-baseline and UI review.
+      # Requires BRAINTRUST_API_KEY secret to be set in the repository.
+      # Each run creates a named experiment tagged with the commit SHA so
+      # regressions are traceable back to the triggering change.
+      # -----------------------------------------------------------------------
+      - name: Run Braintrust evals
+        if: always()
+        env:
+          BRAINTRUST_API_KEY: ${{ secrets.BRAINTRUST_API_KEY }}
+          PYTHONPATH: "."
+        run: |
+          uv run braintrust eval \
+            evals/braintrust/eval_output_quality.py \
+            evals/braintrust/eval_trajectory.py \
+            2>&1 | tee /tmp/braintrust-eval-results.txt
+        working-directory: backend
+
+      - name: Post Braintrust eval summary
+        if: always()
+        run: |
+          echo "## Braintrust Eval Results" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/braintrust-eval-results.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
