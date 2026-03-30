@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass(frozen=True)
 class EvalCase:
     id: str  # stable identifier; used as Braintrust dataset record ID
     input: str  # user message
@@ -117,7 +117,7 @@ TRAJECTORY_CASES: list[EvalCase] = [
     # --- Full booking: retrieve then create_booking ---
     EvalCase(
         id="trajectory-booking-full",
-        input="Book a table for 2 at Nonna's Hearth on March 10th at 7pm",
+        input="Book a table for 2 at Nonna's Hearth on April 10th at 7pm",
         expected=["retrieve", "create_booking"],
         metadata={"category": "booking-full"},
     ),

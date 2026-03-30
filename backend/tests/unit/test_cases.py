@@ -1,6 +1,6 @@
 import dataclasses
 
-from evals.cases import OUTPUT_QUALITY_CASES, TRAJECTORY_CASES
+from evals.cases import OUTPUT_QUALITY_CASES, TRAJECTORY_CASES, EvalCase  # noqa: F401
 
 
 def test_output_quality_cases():
