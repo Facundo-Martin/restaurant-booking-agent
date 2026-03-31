@@ -26,3 +26,11 @@ _mock_sst.Resource.AgentSessions.name = "test-sessions-bucket"
 # being constructed with a MagicMock guardrail ID that would fail Bedrock calls.
 _mock_sst.Resource.RestaurantGuardrail = None
 sys.modules["sst"] = _mock_sst
+
+# Patch out instrumentation before any test imports app.main.
+# instrumentation.setup() is called at module level in app/main.py and requires
+# a real Braintrust API key + OTel connections — neither of which we need in tests.
+from unittest.mock import patch as _patch  # noqa: E402
+
+_patch("app.instrumentation.setup", return_value=None).start()
+_patch("app.instrumentation.flush", return_value=None).start()
