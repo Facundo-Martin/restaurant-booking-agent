@@ -99,8 +99,9 @@ test_cases = [
 
 evaluator = HelpfulnessEvaluator()
 
-experiment = Experiment[str, str](cases=test_cases, evaluators=[evaluator])
-reports = experiment.run_evaluations(run_agent)
+if __name__ == "__main__":
+    experiment = Experiment[str, str](cases=test_cases, evaluators=[evaluator])
+    reports = experiment.run_evaluations(run_agent)
 
-print("=== OTel Scaffold — Helpfulness Results ===")
-reports[0].run_display()
+    print("=== OTel Scaffold — Helpfulness Results ===")
+    reports[0].run_display()

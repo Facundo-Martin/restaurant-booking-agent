@@ -17,7 +17,7 @@ from strands_evals.evaluators import OutputEvaluator, TrajectoryEvaluator
 from strands_evals.extractors import tools_use_extractor
 from strands_tools import retrieve as _real_retrieve
 
-from app.agent.core import SYSTEM_PROMPT, TOOLS, model
+from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
 from evals.cases import OUTPUT_QUALITY_CASES, TRAJECTORY_CASES
 
 pytestmark = pytest.mark.agent
@@ -27,7 +27,8 @@ pytestmark = pytest.mark.agent
 # ---------------------------------------------------------------------------
 _FAKE_RESTAURANTS = (
     "Available restaurants: Nonna's Hearth (Italian, open daily, accepts reservations), "
-    "Bistro Parisienne (French, closed Mondays, accepts reservations)."
+    "Bistro Parisienne (French, closed Mondays, accepts reservations), "
+    "Sakura Garden (Japanese, open daily, accepts reservations)."
 )
 
 
@@ -71,6 +72,7 @@ def _run_agent(case: Case) -> dict:
         tools=_EVAL_TOOLS,
         system_prompt=SYSTEM_PROMPT,
         callback_handler=None,
+        retry_strategy=RETRY_STRATEGY,
     )
 
     with patch("app.tools.bookings.booking_repo", mock_repo):
@@ -143,7 +145,7 @@ def test_tool_trajectory():
     reports[0].display(include_actual_trajectory=True, include_expected_trajectory=True)
 
     # Save for later analysis
-    experiment.to_file("trajectory_evaluation")
+    experiment.to_file("evals/strands/experiment_files/trajectory_evaluation")
 
     # Assert
     pass_rate = sum(reports[0].test_passes) / len(reports[0].test_passes)
@@ -196,7 +198,7 @@ def test_response_quality():
     reports[0].display(include_actual_output=True, include_expected_output=True)
 
     # Save for later analysis
-    experiment.to_file("response_quality_evaluation")
+    experiment.to_file("evals/strands/experiment_files/response_quality_evaluation")
 
     # Assert
     pass_rate = sum(reports[0].test_passes) / len(reports[0].test_passes)
