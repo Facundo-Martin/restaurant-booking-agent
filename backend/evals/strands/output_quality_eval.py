@@ -116,9 +116,17 @@ def _save_report(experiment: object, report: object, ts: str, name: str) -> Path
 
 
 async def main() -> None:
+    # Each agent turn is a separate converse_stream call; cap concurrency to avoid
+    # saturating Bedrock rate limits.
+    _sem = asyncio.Semaphore(2)
+
+    async def _rate_limited(case: Case) -> str:
+        async with _sem:
+            return await get_response(case)
+
     experiment = Experiment(cases=test_cases, evaluators=[evaluator])
-    print(f"Running {len(test_cases)} cases concurrently ...", flush=True)
-    reports = await experiment.run_evaluations_async(get_response)
+    print(f"Running {len(test_cases)} cases (max 2 concurrent) ...", flush=True)
+    reports = await experiment.run_evaluations_async(_rate_limited)
     print("Evaluations complete. Generating report ...", flush=True)
 
     print("=== Output Quality Evaluation Results ===")

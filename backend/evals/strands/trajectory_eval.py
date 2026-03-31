@@ -1,6 +1,9 @@
 # Requires AWS credentials with Bedrock InvokeModel access.
 # Run from the backend/ directory:
 #   PYTHONPATH=. uv run python -u evals/strands/trajectory_eval.py
+#
+# SST resource stubs are loaded from backend/.env automatically.
+# Copy backend/.env.example → backend/.env and fill in values if you haven't already.
 import asyncio
 import json
 import sys
@@ -8,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch  # MagicMock used for booking_repo mock
 
+from dotenv import load_dotenv
 from strands import Agent
 from strands import tool as strands_tool
 from strands.models import BedrockModel
@@ -16,8 +20,12 @@ from strands_evals.evaluators import TrajectoryEvaluator
 from strands_evals.extractors import tools_use_extractor
 from strands_tools import retrieve as _real_retrieve
 
-from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS
-from evals.cases import TRAJECTORY_CASES
+# Load .env before importing app.agent.core — config.py reads SST resource links at
+# import time and will raise if the env vars aren't present.
+load_dotenv()
+
+from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS  # noqa: E402
+from evals.cases import TRAJECTORY_CASES  # noqa: E402
 
 # Haiku is fast, cheap, and has higher rate limits than Sonnet — more than capable of
 # following the system prompt rules for tool routing. We don't need Sonnet quality here.

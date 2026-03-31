@@ -5,8 +5,12 @@
 #
 # Run from the backend/ directory:
 #   PYTHONPATH=. uv run python -u evals/strands/otel_scaffold.py
+#
+# SST resource stubs are loaded from backend/.env automatically.
+# Copy backend/.env.example → backend/.env and fill in values if you haven't already.
 from unittest.mock import MagicMock, patch
 
+from dotenv import load_dotenv
 from strands import Agent
 from strands import tool as strands_tool
 from strands_evals import Case, Experiment
@@ -15,7 +19,11 @@ from strands_evals.mappers import StrandsInMemorySessionMapper
 from strands_evals.telemetry import StrandsEvalsTelemetry
 from strands_tools import retrieve as _real_retrieve
 
-from app.agent.core import SYSTEM_PROMPT, TOOLS, model
+# Load .env before importing app.agent.core — config.py reads SST resource links at
+# import time and will raise if the env vars aren't present.
+load_dotenv()
+
+from app.agent.core import SYSTEM_PROMPT, TOOLS, model  # noqa: E402
 
 # Setup telemetry for trace capture
 telemetry = StrandsEvalsTelemetry().setup_in_memory_exporter()
