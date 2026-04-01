@@ -4,15 +4,17 @@
 Runs all output-quality test cases through the booking agent and scores each
 response with the LLM-as-judge scorer (Bedrock Haiku).
 
-Credentials are loaded automatically from backend/.env by the braintrust CLI.
-Copy backend/.env.example → backend/.env and fill in values before running.
+Copy backend/.env.example → backend/.env and fill in values, then run:
+
+Run (from repo root — recommended):
+    pnpm eval:braintrust:quality
 
 Run (from backend/ directory):
-    # Push results to Braintrust:
-    uv run braintrust eval evals/braintrust/eval_output_quality.py
+    # --env-file handles BRAINTRUST_API_KEY auth and SST_RESOURCE_* stubs:
+    uv run braintrust eval --env-file .env evals/braintrust/eval_output_quality.py
 
     # Local iteration — no upload:
-    uv run braintrust eval --no-send-logs evals/braintrust/eval_output_quality.py
+    uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_output_quality.py
 """
 
 import dataclasses
@@ -20,13 +22,34 @@ import os
 from unittest.mock import MagicMock, patch
 
 from braintrust import Eval
+from dotenv import load_dotenv
 from strands import Agent
 from strands import tool as strands_tool
+from strands.models import BedrockModel
 from strands_tools import retrieve as _real_retrieve
 
-from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
-from evals.cases import OUTPUT_QUALITY_CASES
-from evals.scorers.output_quality_scorer import booking_output_quality_scorer
+# Load SST resource stubs from .env before importing app modules.
+# The braintrust CLI runs this file in its own process; SST_RESOURCE_* vars
+# must be present in os.environ before app.config is imported.
+load_dotenv()
+
+from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS  # noqa: E402
+from evals.cases import OUTPUT_QUALITY_CASES  # noqa: E402
+from evals.scorers.output_quality_scorer import (  # noqa: E402
+    booking_output_quality_scorer,
+)
+
+# Haiku: higher Bedrock throughput limits than Sonnet 3.7, still follows system
+# prompt rules reliably. Output-quality cases test behavioral compliance, not
+# generation quality differences between model tiers.
+_AGENT_MODEL = BedrockModel(
+    model_id="us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    # temperature=0 for deterministic responses — without it the agent
+    # inconsistently skips current_time, guesses the date from training
+    # context, and mis-validates the 60-day booking window.
+    temperature=0,
+    additional_request_fields={"thinking": {"type": "disabled"}},
+)
 
 # ---------------------------------------------------------------------------
 # Canned tool responses — deterministic, no real Knowledge Base calls
@@ -70,7 +93,7 @@ async def run_agent(input: str) -> str:  # noqa: A002
     mock_repo.delete.return_value = True
 
     agent = Agent(
-        model=model,
+        model=_AGENT_MODEL,
         tools=_EVAL_TOOLS,
         system_prompt=SYSTEM_PROMPT,
         callback_handler=None,
@@ -99,8 +122,6 @@ Eval(
     task=run_agent,
     scores=[booking_output_quality_scorer],
     experiment_name=_experiment_name,
-    # Cap concurrency — each case is a Bedrock converse_stream call and Haiku
-    # judge call; too many parallel calls saturate Bedrock rate limits.
     max_concurrency=2,
     metadata={
         "eval_type": "output-quality",

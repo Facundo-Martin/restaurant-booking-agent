@@ -5,15 +5,17 @@ The task function returns both the agent's text response and the actual tool
 trajectory (list of tool names called). The trajectory scorer then compares
 actual vs. expected deterministically — no LLM call, no cost.
 
-Credentials are loaded automatically from backend/.env by the braintrust CLI.
-Copy backend/.env.example → backend/.env and fill in values before running.
+Copy backend/.env.example → backend/.env and fill in values, then run:
+
+Run (from repo root — recommended):
+    pnpm eval:braintrust:trajectory
 
 Run (from backend/ directory):
-    # Push results to Braintrust:
-    uv run braintrust eval evals/braintrust/eval_trajectory.py
+    # --env-file handles BRAINTRUST_API_KEY auth and SST_RESOURCE_* stubs:
+    uv run braintrust eval --env-file .env evals/braintrust/eval_trajectory.py
 
     # Local iteration — no upload:
-    uv run braintrust eval --no-send-logs evals/braintrust/eval_trajectory.py
+    uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_trajectory.py
 """
 
 import dataclasses
@@ -21,14 +23,30 @@ import os
 from unittest.mock import MagicMock, patch
 
 from braintrust import Eval
+from dotenv import load_dotenv
 from strands import Agent
 from strands import tool as strands_tool
+from strands.models import BedrockModel
 from strands_evals.extractors import tools_use_extractor
 from strands_tools import retrieve as _real_retrieve
 
-from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
-from evals.cases import TRAJECTORY_CASES
-from evals.scorers.trajectory_scorer import trajectory_scorer
+# Load SST resource stubs from .env before importing app modules.
+# The braintrust CLI runs this file in its own process; SST_RESOURCE_* vars
+# must be present in os.environ before app.config is imported.
+load_dotenv()
+
+from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS  # noqa: E402
+from evals.cases import TRAJECTORY_CASES  # noqa: E402
+from evals.scorers.trajectory_scorer import trajectory_scorer  # noqa: E402
+
+# Haiku: higher Bedrock throughput limits than Sonnet 3.7, well-suited for
+# tool-routing correctness tests which don't require Sonnet-level reasoning.
+_AGENT_MODEL = BedrockModel(
+    model_id="us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    # temperature=0 for deterministic tool routing — evals must be repeatable.
+    temperature=0,
+    additional_request_fields={"thinking": {"type": "disabled"}},
+)
 
 # ---------------------------------------------------------------------------
 # Canned tool responses
@@ -72,7 +90,7 @@ async def run_agent_with_trajectory(input: str) -> dict:  # noqa: A002
     mock_repo.delete.return_value = True
 
     agent = Agent(
-        model=model,
+        model=_AGENT_MODEL,
         tools=_EVAL_TOOLS,
         system_prompt=SYSTEM_PROMPT,
         callback_handler=None,
