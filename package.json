@@ -11,7 +11,12 @@
     "remove:dev": "sst remove",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "test:backend": "cd backend && uv run pytest tests/ -q",
+    "eval:braintrust:quality": "cd backend && uv run braintrust eval --env-file .env evals/braintrust/eval_output_quality.py",
+    "eval:braintrust:trajectory": "cd backend && uv run braintrust eval --env-file .env evals/braintrust/eval_trajectory.py",
+    "eval:strands:quality": "cd backend && uv run python -u evals/strands/output_quality_eval.py",
+    "eval:strands:trajectory": "cd backend && uv run python -u evals/strands/trajectory_eval.py"
   },
   "devDependencies": {
     "@tsconfig/node22": "^22.0.5",
