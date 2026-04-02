@@ -17,24 +17,29 @@ Run (from backend/ directory):
     uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_output_quality.py
 """
 
-import dataclasses
 import os
 from unittest.mock import MagicMock, patch
 
-from braintrust import Eval
 from dotenv import load_dotenv
 from strands import Agent
 from strands import tool as strands_tool
 from strands.models import BedrockModel
 from strands_tools import retrieve as _real_retrieve
 
+import braintrust
+from braintrust import Eval
+
 # Load SST resource stubs from .env before importing app modules.
 # The braintrust CLI runs this file in its own process; SST_RESOURCE_* vars
 # must be present in os.environ before app.config is imported.
 load_dotenv()
 
-from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS  # noqa: E402
-from evals.cases import OUTPUT_QUALITY_CASES  # noqa: E402
+from app.agent.core import RETRY_STRATEGY, TOOLS  # noqa: E402
+from app.agent.prompt_loader import load_system_prompt  # noqa: E402
+from evals.braintrust.config import (  # noqa: E402
+    BRAINTRUST_PROJECT,
+    OUTPUT_QUALITY_DATASET,
+)
 from evals.scorers.output_quality_scorer import (  # noqa: E402
     booking_output_quality_scorer,
 )
@@ -76,6 +81,10 @@ def retrieve(query: str) -> str:
 
 # Replace the real retrieve in the tool list with the deterministic stub.
 _EVAL_TOOLS = [retrieve if t is _real_retrieve else t for t in TOOLS]
+_DATASET = braintrust.init_dataset(
+    project=BRAINTRUST_PROJECT,
+    name=OUTPUT_QUALITY_DATASET,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +104,7 @@ async def run_agent(input: str) -> str:  # noqa: A002
     agent = Agent(
         model=_AGENT_MODEL,
         tools=_EVAL_TOOLS,
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=load_system_prompt(),
         callback_handler=None,
         retry_strategy=RETRY_STRATEGY,
     )
@@ -107,23 +116,21 @@ async def run_agent(input: str) -> str:  # noqa: A002
 
 
 # ---------------------------------------------------------------------------
-# Eval — cases sourced from evals/cases.py (single source of truth)
-# Adapter: drop 'id' — Braintrust assigns its own record IDs
+# Eval — execute against the managed Braintrust dataset seeded from evals/cases.py
 # ---------------------------------------------------------------------------
 
 _experiment_name = f"output-quality-{os.environ.get('GITHUB_SHA', 'local')[:8]}"
 
 Eval(
-    "Restaurant Booking — Output Quality",
-    data=[
-        {k: v for k, v in dataclasses.asdict(c).items() if k != "id"}
-        for c in OUTPUT_QUALITY_CASES
-    ],
+    BRAINTRUST_PROJECT,
+    data=_DATASET,
     task=run_agent,
     scores=[booking_output_quality_scorer],
     experiment_name=_experiment_name,
-    max_concurrency=2,
+    max_concurrency=1,
     metadata={
+        "project_name": BRAINTRUST_PROJECT,
+        "dataset_name": OUTPUT_QUALITY_DATASET,
         "eval_type": "output-quality",
         "commit": os.environ.get("GITHUB_SHA", "local"),
     },

@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import nullcontext
 from typing import Any
@@ -13,9 +14,11 @@ from strands import Agent
 from strands.agent.conversation_manager import SlidingWindowConversationManager
 from strands.session import S3SessionManager
 
-from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
+from app.agent.core import RETRY_STRATEGY, TOOLS, model
 from app.agent.hooks import CorrelationIdHook, LimitToolCallsHook, TokenMetricsHook
+from app.agent.prompt_loader import load_system_prompt
 from app.config import MAX_AGENT_SECONDS, SESSIONS_BUCKET
+from app.context import current_user_id
 from app.instrumentation import flush as flush_traces
 from app.logging import logger
 from app.metrics import MetricUnit, metrics
@@ -70,9 +73,13 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
         LimitToolCallsHook({"retrieve": 10, "create_booking": 3, "delete_booking": 2}),
     ]
 
+    resolved_user_id = request.session_id or str(uuid.uuid4())
+    system_prompt = load_system_prompt()
+    user_id_token = current_user_id.set(resolved_user_id)
+
     agent = Agent(
         model=model,
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=system_prompt,
         tools=TOOLS,
         callback_handler=None,
         conversation_manager=conversation_manager,
@@ -81,7 +88,7 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
         session_manager=session_manager,
         trace_attributes={
             "session.id": request.session_id or get_correlation_id(),
-            "user.id": request.session_id or "anonymous",
+            "user.id": resolved_user_id,
         },
     )
     # Maps toolUseId → toolName so tool-result events can include the name.
@@ -233,6 +240,7 @@ async def generate_chat_events(  # pylint: disable=too-many-branches,too-many-lo
             data=json.dumps({"type": "error", "error": "An unexpected error occurred."})
         )
     finally:
+        current_user_id.reset(user_id_token)
         # Flush both trace spans and EMF metrics before the response closes.
         # The chat Lambda runs under LWA+uvicorn so @metrics.log_metrics never
         # executes; the generator finally block is the only reliable flush point.

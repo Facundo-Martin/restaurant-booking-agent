@@ -7,6 +7,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from strands.telemetry import StrandsTelemetry
 
+from evals.braintrust.config import BRAINTRUST_PROJECT
 from sst import Resource as SSTResource
 
 _provider: TracerProvider
@@ -18,7 +19,7 @@ def setup() -> None:
 
     # Bridge SST-linked secret into the env var that BraintrustSpanProcessor reads.
     os.environ["BRAINTRUST_API_KEY"] = SSTResource.BraintrustApiKey.value  # type: ignore[attr-defined]
-    os.environ["BRAINTRUST_PARENT"] = "project_name:Restaurant Booking Agent"
+    os.environ["BRAINTRUST_PARENT"] = f"project_name:{BRAINTRUST_PROJECT}"
 
     # Configure the global OTel tracer provider
     _provider = TracerProvider()

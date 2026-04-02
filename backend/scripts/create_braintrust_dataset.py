@@ -12,21 +12,31 @@ Usage:
 """
 
 import dataclasses
+import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
+
+# Ensure the backend package roots (`app`, `evals`) are importable when this
+# script is executed as `python scripts/create_braintrust_dataset.py`.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 # Load .env before importing braintrust so BRAINTRUST_API_KEY is available.
 load_dotenv()
 
 import braintrust  # noqa: E402
-
+from evals.braintrust.config import (  # noqa: E402
+    BRAINTRUST_PROJECT,
+    OUTPUT_QUALITY_DATASET,
+    TRAJECTORY_DATASET,
+)
 from evals.cases import OUTPUT_QUALITY_CASES, TRAJECTORY_CASES  # noqa: E402
 
 
 def seed_dataset(name: str, cases: list) -> None:
     """Push all cases to a Braintrust dataset, upserting by stable record ID."""
     dataset = braintrust.init_dataset(
-        project="Restaurant Booking Agent",
+        project=BRAINTRUST_PROJECT,
         name=name,
     )
     for case in cases:
@@ -42,9 +52,9 @@ def seed_dataset(name: str, cases: list) -> None:
 
 
 if __name__ == "__main__":
-    print("Seeding Braintrust datasets for 'Restaurant Booking Agent' …")
-    seed_dataset("restaurant-agent-output-quality", OUTPUT_QUALITY_CASES)
-    seed_dataset("restaurant-agent-trajectory", TRAJECTORY_CASES)
+    print(f"Seeding Braintrust datasets for '{BRAINTRUST_PROJECT}' …")
+    seed_dataset(OUTPUT_QUALITY_DATASET, OUTPUT_QUALITY_CASES)
+    seed_dataset(TRAJECTORY_DATASET, TRAJECTORY_CASES)
     print(
-        "Done. View datasets at https://www.braintrust.dev under 'Restaurant Booking Agent'."
+        f"Done. View datasets at https://www.braintrust.dev under '{BRAINTRUST_PROJECT}'."
     )
