@@ -37,8 +37,9 @@ jobs:
         uses: braintrustdata/eval-action@v1
         with:
           runtime: python
+          package_manager: uv
           root: backend
-          files: |
+          paths: |
             evals/braintrust/eval_output_quality.py
             evals/braintrust/eval_trajectory.py
           api_key: ${{ secrets.BRAINTRUST_API_KEY }}
