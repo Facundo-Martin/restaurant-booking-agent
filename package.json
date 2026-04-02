@@ -1,28 +1,37 @@
 {
   "name": "restaurant-booking-agent",
   "private": true,
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev": "sst dev",
-    "api": "sst shell -- sh -c 'cd backend && uv run uvicorn app.main:app --reload'",
+    "dev:api": "sst shell -- sh -c 'cd backend && uv run uvicorn app.main:app --reload'",
     "deploy": "sst deploy --stage dev",
     "deploy:prod": "sst deploy --stage production",
     "remove:dev": "sst remove",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "test:backend": "cd backend && uv run pytest tests/ -q",
+    "test:backend:fast": "cd backend && uv run pytest tests/unit tests/integration -q -m 'not agent'",
+    "eval:braintrust:seed": "cd backend && uv run python scripts/create_braintrust_dataset.py",
+    "eval:braintrust:quality": "cd backend && uv run braintrust eval --env-file .env evals/braintrust/eval_output_quality.py",
+    "eval:braintrust:trajectory": "cd backend && uv run braintrust eval --env-file .env evals/braintrust/eval_trajectory.py",
+    "braintrust:push:prompts": "cd backend && uv run braintrust push --env-file .env braintrust/prompts/restaurant_booking_agent.py",
+    "eval:strands:quality": "cd backend && uv run python -u evals/strands/output_quality_eval.py",
+    "eval:strands:trajectory": "cd backend && uv run python -u evals/strands/trajectory_eval.py"
   },
   "devDependencies": {
-    "@tsconfig/node22": "^22",
+    "@tsconfig/node22": "^22.0.5",
     "concurrently": "^9.2.1",
-    "turbo": "^2.8.10",
-    "typescript": "^5"
+    "turbo": "^2.8.20",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock-agent-runtime": "^3.995.0",
-    "@aws-sdk/client-rds": "^3.996.0",
-    "@aws-sdk/client-rds-data": "^3.996.0",
-    "@pulumi/command": "^1.2.0",
-    "sst": "^3.18.12"
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.1018.0",
+    "@aws-sdk/client-rds": "^3.1018.0",
+    "@aws-sdk/client-rds-data": "^3.1018.0",
+    "@pulumi/command": "^1.2.1",
+    "sst": "^3.19.3"
   }
 }

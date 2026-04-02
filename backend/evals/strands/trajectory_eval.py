@@ -1,6 +1,9 @@
 # Requires AWS credentials with Bedrock InvokeModel access.
 # Run from the backend/ directory:
-#   PYTHONPATH=. SST_RESOURCE_Bookings='{"name":"<table>"}' SST_RESOURCE_RestaurantKB='{"id":"<kb-id>"}' SST_RESOURCE_AgentSessions='{"name":"placeholder"}' uv run python -u tests/evals/trajectory_eval.py
+#   PYTHONPATH=. uv run python -u evals/strands/trajectory_eval.py
+#
+# SST resource stubs are loaded from backend/.env automatically.
+# Copy backend/.env.example → backend/.env and fill in values if you haven't already.
 import asyncio
 import json
 import sys
@@ -8,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch  # MagicMock used for booking_repo mock
 
+from dotenv import load_dotenv
 from strands import Agent
 from strands import tool as strands_tool
 from strands.models import BedrockModel
@@ -16,7 +20,12 @@ from strands_evals.evaluators import TrajectoryEvaluator
 from strands_evals.extractors import tools_use_extractor
 from strands_tools import retrieve as _real_retrieve
 
-from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS
+# Load .env before importing app.agent.core — config.py reads SST resource links at
+# import time and will raise if the env vars aren't present.
+load_dotenv()
+
+from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS  # noqa: E402
+from evals.cases import TRAJECTORY_CASES  # noqa: E402
 
 # Haiku is fast, cheap, and has higher rate limits than Sonnet — more than capable of
 # following the system prompt rules for tool routing. We don't need Sonnet quality here.
@@ -35,7 +44,7 @@ _FAKE_RESTAURANTS = (
 _FAKE_BOOKING = {
     "booking_id": "B-456",
     "restaurant_name": "Nonna's Hearth",
-    "date": "2026-03-20",
+    "date": "2026-04-10",
     "party_size": 2,
     "status": "confirmed",
 }
@@ -86,53 +95,10 @@ async def get_response_with_tools(case: Case) -> dict:
     return {"output": str(response), "trajectory": trajectory}
 
 
-# Create test cases with expected tool usage
+# Inline adapter: EvalCase → strands_evals.Case (trajectory form)
 test_cases = [
-    # --- Discovery: retrieve MUST be called ---
-    Case[str, str](
-        name="discovery-list-all",
-        input="What restaurants do you have available?",
-        expected_trajectory=["retrieve"],
-        metadata={"category": "discovery"},
-    ),
-    Case[str, str](
-        name="discovery-by-cuisine",
-        input="Do you have any Italian restaurants?",
-        expected_trajectory=["retrieve"],
-        metadata={"category": "discovery"},
-    ),
-    # --- Clarification: no tools until details are provided ---
-    Case[str, str](
-        name="booking-vague-first-turn",
-        input="Book a table for me tonight",
-        expected_trajectory=[],  # must ask for clarification, not call any tools
-        metadata={"category": "booking-clarification"},
-    ),
-    # --- Relative date: current_time must fire before retrieve ---
-    Case[str, str](
-        name="booking-relative-date",
-        input="Book a table for 2 at Nonna's Hearth tonight at 7pm",
-        expected_trajectory=["current_time", "retrieve"],
-        # Agent must call current_time to resolve "tonight" and verify the date
-        # is within the 60-day window, then retrieve to verify the restaurant.
-        # create_booking is NOT expected here because the agent still needs
-        # explicit user confirmation before proceeding (single-turn eval).
-        metadata={"category": "booking-relative-date"},
-    ),
-    # --- Booking lookup ---
-    Case[str, str](
-        name="get-booking-details",
-        input="What are the details for booking B-456?",
-        expected_trajectory=["get_booking_details"],
-        metadata={"category": "booking-lookup"},
-    ),
-    # --- Off-topic: no tools should be called ---
-    Case[str, str](
-        name="off-topic-no-tools",
-        input="What's the weather like in London today?",
-        expected_trajectory=[],
-        metadata={"category": "safety"},
-    ),
+    Case(name=c.id, input=c.input, expected_trajectory=c.expected, metadata=c.metadata)
+    for c in TRAJECTORY_CASES
 ]
 
 # Create trajectory evaluator
@@ -208,7 +174,7 @@ def _save_report(experiment: object, report: object, ts: str, name: str) -> Path
         "case_results": case_results,
     }
 
-    out_dir = Path("tests/evals/experiment_files")
+    out_dir = Path("evals/strands/experiment_files")
     out_dir.mkdir(exist_ok=True)
     out_path = out_dir / f"{name}_{ts}.json"
     out_path.write_text(json.dumps(data, indent=2))
@@ -216,7 +182,7 @@ def _save_report(experiment: object, report: object, ts: str, name: str) -> Path
 
 
 async def main() -> None:
-    experiment = Experiment[str, str](cases=test_cases, evaluators=[evaluator])
+    experiment = Experiment(cases=test_cases, evaluators=[evaluator])
 
     # Each agent turn is a separate converse_stream call, so even a few concurrent
     # cases can saturate rate limits. Haiku handles concurrency well but a small cap

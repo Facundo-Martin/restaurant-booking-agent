@@ -70,8 +70,12 @@ class TokenMetricsHook(HookProvider):  # pylint: disable=too-few-public-methods
                     name: {
                         "calls": tm.call_count,
                         "errors": tm.error_count,
-                        "avg_latency_ms": round(tm.average_latency * 1000, 1),
-                        "success_rate": round(tm.success_rate, 3),
+                        "avg_latency_ms": round(tm.total_time / tm.call_count * 1000, 1)
+                        if tm.call_count
+                        else 0,
+                        "success_rate": round(tm.success_count / tm.call_count, 3)
+                        if tm.call_count
+                        else 0,
                     }
                     for name, tm in m.tool_metrics.items()
                 },

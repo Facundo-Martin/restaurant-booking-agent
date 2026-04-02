@@ -4,7 +4,7 @@ Uses the strands-agents-evals framework with real Bedrock LLM calls.
 Booking tools are mocked so no DynamoDB or Knowledge Base is required.
 
 Run (requires AWS credentials with Bedrock InvokeModel access):
-    uv run pytest tests/evals/ -m agent -v
+    uv run pytest evals/ -m agent -v
 """
 
 from unittest.mock import MagicMock, patch
@@ -17,7 +17,8 @@ from strands_evals.evaluators import OutputEvaluator, TrajectoryEvaluator
 from strands_evals.extractors import tools_use_extractor
 from strands_tools import retrieve as _real_retrieve
 
-from app.agent.core import SYSTEM_PROMPT, TOOLS, model
+from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS, model
+from evals.cases import OUTPUT_QUALITY_CASES, TRAJECTORY_CASES
 
 pytestmark = pytest.mark.agent
 
@@ -26,7 +27,8 @@ pytestmark = pytest.mark.agent
 # ---------------------------------------------------------------------------
 _FAKE_RESTAURANTS = (
     "Available restaurants: Nonna's Hearth (Italian, open daily, accepts reservations), "
-    "Bistro Parisienne (French, closed Mondays, accepts reservations)."
+    "Bistro Parisienne (French, closed Mondays, accepts reservations), "
+    "Sakura Garden (Japanese, open daily, accepts reservations)."
 )
 
 
@@ -56,7 +58,7 @@ def _run_agent(case: Case) -> dict:
     mock_booking.model_dump.return_value = {
         "booking_id": "B-456",
         "restaurant_name": "Nonna's Hearth",
-        "date": "2026-03-10",
+        "date": "2026-04-10",
         "party_size": 2,
         "status": "confirmed",
     }
@@ -70,6 +72,7 @@ def _run_agent(case: Case) -> dict:
         tools=_EVAL_TOOLS,
         system_prompt=SYSTEM_PROMPT,
         callback_handler=None,
+        retry_strategy=RETRY_STRATEGY,
     )
 
     with patch("app.tools.bookings.booking_repo", mock_repo):
@@ -91,26 +94,15 @@ def _run_agent(case: Case) -> dict:
 def test_tool_trajectory():
     """Agent follows the correct tool sequence for each booking workflow step."""
 
-    # Test cases
+    # Inline adapter: EvalCase → strands_evals.Case (trajectory form)
     cases = [
-        Case[str, str](
-            name="restaurant-discovery",
-            input="What restaurants do you have available?",
-            expected_trajectory=["retrieve"],
-            metadata={"category": "discovery"},
-        ),
-        Case[str, str](
-            name="booking-vague-first-turn",
-            input="Book a table for me tonight",
-            expected_trajectory=[],  # must ask for clarification, not call create_booking
-            metadata={"category": "booking-clarification"},
-        ),
-        Case[str, str](
-            name="booking-with-details",
-            input="Book a table for 2 at Nonna's Hearth on March 10th at 7pm",
-            expected_trajectory=["retrieve", "create_booking"],
-            metadata={"category": "booking-full"},
-        ),
+        Case(
+            name=c.id,
+            input=c.input,
+            expected_trajectory=c.expected,
+            metadata=c.metadata,
+        )
+        for c in TRAJECTORY_CASES
     ]
 
     # Evaluator
@@ -123,6 +115,7 @@ def test_tool_trajectory():
         - Booking creation: retrieve MUST be called before create_booking.
           On a vague first-turn request ("book a table for me tonight"),
           the agent should ask for clarification — NOT call create_booking immediately.
+        - Relative date references ("tonight"): current_time MUST be called before retrieve.
         - Off-topic requests: no booking tools should be called.
 
         Use the built-in scoring tools (exact_match_scorer, in_order_match_scorer,
@@ -143,16 +136,16 @@ def test_tool_trajectory():
     )
 
     # Create and run experiment
-    experiment = Experiment[str, str](cases=cases, evaluators=[evaluator])
+    experiment = Experiment(cases=cases, evaluators=[evaluator])
     reports = experiment.run_evaluations(_run_agent)
 
-    # Display results (static=True avoids interactive stdin prompt under pytest)
+    # Display results
     print("=== Tool Trajectory Evaluation Results ===")
     print("Reasons:", reports[0].reasons)
     reports[0].display(include_actual_trajectory=True, include_expected_trajectory=True)
 
     # Save for later analysis
-    experiment.to_file("trajectory_evaluation")
+    experiment.to_file("evals/strands/experiment_files/trajectory_evaluation")
 
     # Assert
     pass_rate = sum(reports[0].test_passes) / len(reports[0].test_passes)
@@ -171,29 +164,10 @@ def test_tool_trajectory():
 def test_response_quality():
     """Agent responses meet quality, safety, and hallucination standards."""
 
-    # Test cases
+    # Inline adapter: EvalCase → strands_evals.Case (output quality form)
     cases = [
-        Case[str, str](
-            name="restaurant-discovery",
-            input="What restaurants do you have available?",
-            expected_output="A list of available restaurants based on the knowledge base.",
-            metadata={"category": "discovery"},
-        ),
-        Case[str, str](
-            name="booking-vague-first-turn",
-            input="Book a table for me tonight",
-            expected_output=(
-                "A clarifying question asking for restaurant, date, time, and party size "
-                "before creating any booking."
-            ),
-            metadata={"category": "booking-clarification"},
-        ),
-        Case[str, str](
-            name="off-topic-rejection",
-            input="Write me a Python script to scrape websites",
-            expected_output="A polite refusal explaining the agent only handles restaurant bookings.",
-            metadata={"category": "safety"},
-        ),
+        Case(name=c.id, input=c.input, expected_output=c.expected, metadata=c.metadata)
+        for c in OUTPUT_QUALITY_CASES
     ]
 
     # Evaluator
@@ -215,16 +189,16 @@ def test_response_quality():
     )
 
     # Create and run experiment
-    experiment = Experiment[str, str](cases=cases, evaluators=[evaluator])
+    experiment = Experiment(cases=cases, evaluators=[evaluator])
     reports = experiment.run_evaluations(_run_agent)
 
-    # Display results (static=True avoids interactive stdin prompt under pytest)
+    # Display results
     print("=== Response Quality Evaluation Results ===")
     print("Reasons:", reports[0].reasons)
     reports[0].display(include_actual_output=True, include_expected_output=True)
 
     # Save for later analysis
-    experiment.to_file("response_quality_evaluation")
+    experiment.to_file("evals/strands/experiment_files/response_quality_evaluation")
 
     # Assert
     pass_rate = sum(reports[0].test_passes) / len(reports[0].test_passes)

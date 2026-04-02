@@ -20,7 +20,7 @@ import app.repositories.bookings as _repo_module
 
 @pytest.fixture(scope="module")
 def real_table():
-    """Swap the repository's module-level _table to a real DynamoDB table.
+    """Swap the repository's module-level cached table to a real DynamoDB table.
 
     Mirrors the unit-test pattern (moto swap) but uses a real boto3 resource
     backed by the DynamoDB table in the test SST stage. Restores the original
@@ -33,10 +33,10 @@ def real_table():
     dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
     real = dynamodb.Table(table_name)
 
-    original = _repo_module._table  # pylint: disable=protected-access
-    _repo_module._table = real  # pylint: disable=protected-access
+    original = _repo_module._TABLE_HANDLE  # pylint: disable=protected-access
+    _repo_module._TABLE_HANDLE = real  # pylint: disable=protected-access
     yield real
-    _repo_module._table = original  # pylint: disable=protected-access
+    _repo_module._TABLE_HANDLE = original  # pylint: disable=protected-access
 
 
 @pytest.fixture(scope="module")

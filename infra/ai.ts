@@ -205,11 +205,14 @@ const guardrail = new aws.bedrock.Guardrail("RestaurantGuardrail", {
     topicsConfigs: [
       {
         name: "off-topic",
-        definition: "Any topic unrelated to restaurant discovery, menus, or table reservations.",
+        definition:
+          "Requests that have absolutely no connection to restaurants, dining, food, menus, reservations, or bookings — such as politics, coding, creative writing, general trivia, or personal advice.",
         examples: [
           "What is the weather like today?",
           "Write me a Python script.",
           "Tell me a joke.",
+          "Who won the election?",
+          "Help me write an essay.",
         ],
         type: "DENY",
       },

@@ -13,6 +13,7 @@ dependencies = [
     "sst",
     "sse-starlette>=3.2.0",
     "aws-lambda-powertools[tracer]>=3.25.0",
+    "braintrust[otel]>=0.0.176",
 ]
 
 [dependency-groups]
@@ -25,6 +26,8 @@ dev = [
     "ty>=0.0.1",
     "ruff>=0.9.0",
     "pylint>=4.0.5",
+    "autoevals>=0.0.99",
+    "python-dotenv>=1.0.0",
 ]
 
 # SST Python SDK is not published to PyPI — install from source
@@ -40,11 +43,12 @@ select = ["E", "W", "F", "I", "B", "UP"]
 ignore = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app"]
+known-first-party = ["app", "evals"]
 
 [tool.pylint.messages_control]
 disable = [
     "C0301",  # line-too-long — ruff enforces line length; avoid double-reporting
+    "C0411",  # wrong-import-order — ruff/isort owns import ordering
     "R0801",  # duplicate-code — false positive on structurally similar Pydantic field lists
     "R0903",  # too-few-public-methods — Starlette middleware only requires dispatch()
 ]
@@ -53,7 +57,7 @@ disable = [
 max-line-length = 88  # match ruff
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "evals"]
 asyncio_mode = "auto"
 markers = [
     "integration: requires a deployed AWS test stage — set INTEGRATION_TABLE_NAME / INTEGRATION_API_URL / INTEGRATION_CHAT_URL",

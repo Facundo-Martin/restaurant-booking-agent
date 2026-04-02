@@ -37,7 +37,7 @@ const table = new sst.aws.Dynamo("Bookings", {
     restaurant_name: "string",
     date: "string",
   },
-  primaryIndex: { hashKey: "booking_id", rangeKey: "restaurant_name" },
+  primaryIndex: { hashKey: "booking_id" },
   globalIndexes: {
     // Enables queries like "all bookings at Restaurant X on date Y" without a full table scan
     ByRestaurantDate: {
