@@ -48,6 +48,7 @@ known-first-party = ["app", "evals"]
 [tool.pylint.messages_control]
 disable = [
     "C0301",  # line-too-long — ruff enforces line length; avoid double-reporting
+    "C0411",  # wrong-import-order — ruff/isort owns import ordering
     "R0801",  # duplicate-code — false positive on structurally similar Pydantic field lists
     "R0903",  # too-few-public-methods — Starlette middleware only requires dispatch()
 ]
