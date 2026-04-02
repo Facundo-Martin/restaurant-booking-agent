@@ -22,11 +22,9 @@ def dynamodb_table():
             TableName=_TABLE_NAME,
             KeySchema=[
                 {"AttributeName": "booking_id", "KeyType": "HASH"},
-                {"AttributeName": "restaurant_name", "KeyType": "RANGE"},
             ],
             AttributeDefinitions=[
                 {"AttributeName": "booking_id", "AttributeType": "S"},
-                {"AttributeName": "restaurant_name", "AttributeType": "S"},
             ],
             BillingMode="PAY_PER_REQUEST",
         )

@@ -4,7 +4,7 @@ from evals.cases import OUTPUT_QUALITY_CASES, TRAJECTORY_CASES, EvalCase  # noqa
 
 
 def test_output_quality_cases():
-    assert len(OUTPUT_QUALITY_CASES) == 11
+    assert len(OUTPUT_QUALITY_CASES) == 12
     for case in OUTPUT_QUALITY_CASES:
         assert dataclasses.is_dataclass(case)
         assert isinstance(case.id, str) and case.id

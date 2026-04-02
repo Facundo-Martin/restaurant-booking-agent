@@ -4,7 +4,7 @@ from app.repositories import bookings as booking_repo
 
 
 def test_get_returns_none_when_not_found(dynamodb_table):
-    assert booking_repo.get("nonexistent-id", "Any Restaurant") is None
+    assert booking_repo.get("nonexistent-id") is None
 
 
 def test_create_and_get_roundtrip(dynamodb_table):
@@ -15,7 +15,7 @@ def test_create_and_get_roundtrip(dynamodb_table):
         party_size=2,
     )
 
-    fetched = booking_repo.get(booking.booking_id, "Nonna's Hearth")
+    fetched = booking_repo.get(booking.booking_id)
 
     assert fetched is not None
     assert fetched.booking_id == booking.booking_id
@@ -33,7 +33,7 @@ def test_create_with_special_requests(dynamodb_table):
         special_requests="Gluten-free menu please",
     )
 
-    fetched = booking_repo.get(booking.booking_id, "Bistro Parisienne")
+    fetched = booking_repo.get(booking.booking_id)
 
     assert fetched is not None
     assert fetched.special_requests == "Gluten-free menu please"
@@ -58,12 +58,12 @@ def test_delete_existing_booking(dynamodb_table):
         party_size=3,
     )
 
-    assert booking_repo.delete(booking.booking_id, "The Coastal Bloom") is True
-    assert booking_repo.get(booking.booking_id, "The Coastal Bloom") is None
+    assert booking_repo.delete(booking.booking_id) is True
+    assert booking_repo.get(booking.booking_id) is None
 
 
 def test_delete_nonexistent_booking(dynamodb_table):
-    assert booking_repo.delete("nonexistent-id", "Any Restaurant") is False
+    assert booking_repo.delete("nonexistent-id") is False
 
 
 def test_delete_is_idempotent(dynamodb_table):
@@ -74,5 +74,5 @@ def test_delete_is_idempotent(dynamodb_table):
         party_size=2,
     )
 
-    assert booking_repo.delete(booking.booking_id, "Rice & Spice") is True
-    assert booking_repo.delete(booking.booking_id, "Rice & Spice") is False
+    assert booking_repo.delete(booking.booking_id) is True
+    assert booking_repo.delete(booking.booking_id) is False

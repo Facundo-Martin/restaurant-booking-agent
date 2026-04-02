@@ -7,7 +7,6 @@ Callers receive typed Booking objects — never raw dicts.
 import uuid
 
 import boto3
-from boto3.dynamodb.conditions import Key
 
 from app.config import TABLE_NAME
 from app.models.schemas import Booking
@@ -17,22 +16,10 @@ from app.models.schemas import Booking
 _table = boto3.resource("dynamodb").Table(TABLE_NAME)
 
 
-def get(booking_id: str, restaurant_name: str | None = None) -> Booking | None:
-    """Fetch a booking by booking_id.
-
-    If restaurant_name is provided uses get_item (exact key lookup).
-    Otherwise falls back to query on the partition key alone — useful when
-    the caller only knows the booking ID.
-    """
-    if restaurant_name is not None:
-        response = _table.get_item(
-            Key={"booking_id": booking_id, "restaurant_name": restaurant_name}
-        )
-        item = response.get("Item")
-    else:
-        response = _table.query(KeyConditionExpression=Key("booking_id").eq(booking_id))
-        items = response.get("Items", [])
-        item = items[0] if items else None
+def get(booking_id: str) -> Booking | None:
+    """Fetch a booking by booking_id."""
+    response = _table.get_item(Key={"booking_id": booking_id})
+    item = response.get("Item")
     return Booking.model_validate(item) if item else None
 
 
@@ -56,11 +43,11 @@ def create(
     return booking
 
 
-def delete(booking_id: str, restaurant_name: str) -> bool:
+def delete(booking_id: str) -> bool:
     """Delete a booking. Returns True if deleted, False if not found."""
     try:
         _table.delete_item(
-            Key={"booking_id": booking_id, "restaurant_name": restaurant_name},
+            Key={"booking_id": booking_id},
             ConditionExpression="attribute_exists(booking_id)",
         )
         return True

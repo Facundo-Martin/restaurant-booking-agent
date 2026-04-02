@@ -113,7 +113,7 @@ def test_correlation_id_returned():
 
 def test_get_booking_found():
     with patch("app.repositories.bookings.get", return_value=_SAMPLE_BOOKING):
-        response = client.get("/bookings/abc-123?restaurant_name=Nonna%27s+Hearth")
+        response = client.get("/bookings/abc-123")
 
     assert response.status_code == 200
     assert response.json()["booking_id"] == "abc-123"
@@ -121,14 +121,9 @@ def test_get_booking_found():
 
 def test_get_booking_not_found():
     with patch("app.repositories.bookings.get", return_value=None):
-        response = client.get("/bookings/missing?restaurant_name=Any")
+        response = client.get("/bookings/missing")
 
     assert response.status_code == 404
-
-
-def test_get_booking_missing_restaurant_name():
-    response = client.get("/bookings/abc-123")
-    assert response.status_code == 422
 
 
 # ---------------------------------------------------------------------------
@@ -138,21 +133,16 @@ def test_get_booking_missing_restaurant_name():
 
 def test_delete_booking_success():
     with patch("app.repositories.bookings.delete", return_value=True):
-        response = client.delete("/bookings/abc-123?restaurant_name=Nonna%27s+Hearth")
+        response = client.delete("/bookings/abc-123")
 
     assert response.status_code == 204
 
 
 def test_delete_booking_not_found():
     with patch("app.repositories.bookings.delete", return_value=False):
-        response = client.delete("/bookings/missing?restaurant_name=Any")
+        response = client.delete("/bookings/missing")
 
     assert response.status_code == 404
-
-
-def test_delete_booking_missing_restaurant_name():
-    response = client.delete("/bookings/abc-123")
-    assert response.status_code == 422
 
 
 # ---------------------------------------------------------------------------
