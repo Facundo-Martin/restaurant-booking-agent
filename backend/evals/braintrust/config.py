@@ -41,12 +41,3 @@ EVAL_JUDGE_MODEL_ID = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 OUTPUT_QUALITY_SCORER_VERSION = "output-quality-v2"
 TRAJECTORY_SCORER_VERSION = "trajectory-v1"
 WORKFLOW_SCORER_VERSION = "workflow-v1"
-
-# ---------------------------------------------------------------------------
-# Dataset version mode
-# ---------------------------------------------------------------------------
-# For local development, `None` resolves to the latest dataset version.
-# In CI, BRAINTRUST_*_DATASET_VERSION env vars must be set explicitly so
-# runs are reproducible.  The eval runners read these env vars at startup
-# and abort if they are missing in CI mode.
-LOCAL_DATASET_VERSION_DEFAULT = None  # "latest" — acceptable for local dev only
