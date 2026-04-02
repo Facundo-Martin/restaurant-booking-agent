@@ -8,7 +8,6 @@ from opentelemetry.sdk.trace import TracerProvider
 from strands.telemetry import StrandsTelemetry
 
 from evals.braintrust.config import BRAINTRUST_PROJECT
-from sst import Resource as SSTResource
 
 _provider: TracerProvider
 
@@ -16,6 +15,7 @@ _provider: TracerProvider
 def setup() -> None:
     """Register the Braintrust TracerProvider. Call once at application startup."""
     global _provider  # pylint: disable=global-statement
+    from sst import Resource as SSTResource  # pylint: disable=import-outside-toplevel
 
     # Bridge SST-linked secret into the env var that BraintrustSpanProcessor reads.
     os.environ["BRAINTRUST_API_KEY"] = SSTResource.BraintrustApiKey.value  # type: ignore[attr-defined]
