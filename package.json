@@ -15,8 +15,8 @@
     "test:backend": "cd backend && uv run pytest tests/ -q",
     "test:backend:fast": "cd backend && uv run pytest tests/unit tests/integration -q -m 'not agent'",
     "eval:braintrust:seed": "cd backend && uv run python scripts/create_braintrust_dataset.py",
-    "eval:braintrust:quality": "cd backend && uv run braintrust eval --env-file .env evals/braintrust/eval_output_quality.py",
-    "eval:braintrust:trajectory": "cd backend && uv run braintrust eval --env-file .env evals/braintrust/eval_trajectory.py",
+    "eval:braintrust:quality": "pnpm eval:braintrust:seed && cd backend && uv run braintrust eval --env-file .env evals/braintrust/eval_output_quality.py",
+    "eval:braintrust:trajectory": "pnpm eval:braintrust:seed && cd backend && uv run braintrust eval --env-file .env evals/braintrust/eval_trajectory.py",
     "braintrust:push:prompts": "cd backend && uv run braintrust push --env-file .env braintrust/prompts/restaurant_booking_agent.py",
     "eval:strands:quality": "cd backend && uv run python -u evals/strands/output_quality_eval.py",
     "eval:strands:trajectory": "cd backend && uv run python -u evals/strands/trajectory_eval.py"

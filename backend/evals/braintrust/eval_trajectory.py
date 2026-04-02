@@ -28,7 +28,6 @@ from strands.models import BedrockModel
 from strands_evals.extractors import tools_use_extractor
 from strands_tools import retrieve as _real_retrieve
 
-import braintrust
 from braintrust import Eval
 
 # Load SST resource stubs from .env before importing app modules.
@@ -40,14 +39,32 @@ from app.agent.core import RETRY_STRATEGY, TOOLS  # noqa: E402
 from app.agent.prompt_loader import load_system_prompt  # noqa: E402
 from evals.braintrust.config import (  # noqa: E402
     BRAINTRUST_PROJECT,
+    EVAL_AGENT_MODEL_ID,
+    SYSTEM_PROMPT_SLUG,
     TRAJECTORY_DATASET,
+    TRAJECTORY_SCORER_VERSION,
 )
+from evals.braintrust.datasets import (  # noqa: E402
+    assert_case_count_matches,
+    load_dataset,
+)
+from evals.braintrust.manifest import EvalMetadata  # noqa: E402
+from evals.cases import TRAJECTORY_CASES  # noqa: E402
 from evals.scorers.trajectory_scorer import trajectory_scorer  # noqa: E402
 
+# ---------------------------------------------------------------------------
+# Dataset — always latest, guarded against empty results and case drift
+# ---------------------------------------------------------------------------
+_dataset, _rows = load_dataset(BRAINTRUST_PROJECT, TRAJECTORY_DATASET, version=None)
+assert_case_count_matches(_rows, TRAJECTORY_CASES, TRAJECTORY_DATASET)
+
+# ---------------------------------------------------------------------------
+# Agent model
+# ---------------------------------------------------------------------------
 # Haiku: higher Bedrock throughput limits than Sonnet 3.7, well-suited for
 # tool-routing correctness tests which don't require Sonnet-level reasoning.
 _AGENT_MODEL = BedrockModel(
-    model_id="us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    model_id=EVAL_AGENT_MODEL_ID,
     # temperature=0 for deterministic tool routing — evals must be repeatable.
     temperature=0,
     additional_request_fields={"thinking": {"type": "disabled"}},
@@ -78,10 +95,6 @@ def retrieve(query: str) -> str:
 
 # Replace the real retrieve in the tool list with the deterministic stub.
 _EVAL_TOOLS = [retrieve if t is _real_retrieve else t for t in TOOLS]
-_DATASET = braintrust.init_dataset(
-    project=BRAINTRUST_PROJECT,
-    name=TRAJECTORY_DATASET,
-)
 
 
 # ---------------------------------------------------------------------------
@@ -119,19 +132,24 @@ async def run_agent_with_trajectory(input: str) -> dict:  # noqa: A002
 # Eval — execute against the managed Braintrust dataset seeded from evals/cases.py
 # ---------------------------------------------------------------------------
 
-_experiment_name = f"trajectory-{os.environ.get('GITHUB_SHA', 'local')[:8]}"
+_commit = os.environ.get("GITHUB_SHA", "local")
+_experiment_name = f"trajectory-{_commit[:8]}"
+
+_metadata = EvalMetadata(
+    project_name=BRAINTRUST_PROJECT,
+    dataset_name=TRAJECTORY_DATASET,
+    prompt_slug=SYSTEM_PROMPT_SLUG,
+    agent_model_id=EVAL_AGENT_MODEL_ID,
+    scorer_version=TRAJECTORY_SCORER_VERSION,
+    commit=_commit,
+)
 
 Eval(
     BRAINTRUST_PROJECT,
-    data=_DATASET,
+    data=_dataset,
     task=run_agent_with_trajectory,
     scores=[trajectory_scorer],
     experiment_name=_experiment_name,
     max_concurrency=1,
-    metadata={
-        "project_name": BRAINTRUST_PROJECT,
-        "dataset_name": TRAJECTORY_DATASET,
-        "eval_type": "trajectory",
-        "commit": os.environ.get("GITHUB_SHA", "local"),
-    },
+    metadata=_metadata.to_metadata(),
 )

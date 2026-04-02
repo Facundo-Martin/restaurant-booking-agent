@@ -48,13 +48,24 @@ def seed_dataset(name: str, cases: list) -> None:
             id=record["id"],
         )
     dataset.flush()
-    print(f"  Seeded {len(cases)} records → '{name}'")
+
+    # summarize() returns the dataset URL and data counts after flushing.
+    summary = dataset.summarize(summarize_data=True)
+    row_count = (
+        summary.data_summary.total_records if summary.data_summary else len(cases)
+    )
+    print(f"  ✓ {name}")
+    print(f"    seeded : {len(cases)} cases")
+    print(f"    total  : {row_count} rows in Braintrust")
+    print(f"    url    : {summary.dataset_url}")
 
 
 if __name__ == "__main__":
-    print(f"Seeding Braintrust datasets for '{BRAINTRUST_PROJECT}' …")
+    print(f"Seeding Braintrust datasets for '{BRAINTRUST_PROJECT}' …\n")
     seed_dataset(OUTPUT_QUALITY_DATASET, OUTPUT_QUALITY_CASES)
+    print()
     seed_dataset(TRAJECTORY_DATASET, TRAJECTORY_CASES)
     print(
-        f"Done. View datasets at https://www.braintrust.dev under '{BRAINTRUST_PROJECT}'."
+        "\nDone. Pin a dataset version by passing BRAINTRUST_OUTPUT_QUALITY_DATASET_VERSION "
+        "or BRAINTRUST_TRAJECTORY_DATASET_VERSION when running evals."
     )
