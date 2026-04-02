@@ -34,3 +34,4 @@ backend/tests/evals/experiment_files/
 
 # misc
 .DS_Store
+.turbo/
