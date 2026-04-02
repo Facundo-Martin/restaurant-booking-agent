@@ -1,12 +1,18 @@
-# Fix Booking Tool Parameters Implementation Plan
+# Fix Booking Tool Params and Braintrust Eval Integrity Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fix two agent hallucination bugs caused by tool parameters that expose internal system details to the LLM — `restaurant_name` as a DynamoDB sort key requirement and `user_id` as a required booking parameter.
+**Goal:** Fix the booking-tool hallucination bugs and clean up the Braintrust integration so traces, datasets, prompts, and eval runs all live under one project with explicit prompt versioning.
 
-**Architecture:** Bug 1 drops the redundant DynamoDB composite key (booking_id UUID is globally unique) so `delete_booking` only needs `booking_id`. Bug 2 moves `user_id` out of the tool's visible parameters into a request-scoped `ContextVar`, seeded with a UUID placeholder until real JWT auth is wired up.
+**Architecture:** Bug 1 drops the redundant DynamoDB composite key (booking_id UUID is globally unique) so `delete_booking` only needs `booking_id`. Bug 2 moves `user_id` out of the tool's visible parameters into a request-scoped `ContextVar`, seeded with a UUID placeholder until real JWT auth is wired up. On the eval side, all Braintrust entry points must share one canonical project constant (`Restaurant Booking Agent`), and the agent prompt must be pushed as a named Braintrust prompt with a stable slug so Braintrust can manage versions while the app can optionally load a specific `version` or `environment`.
 
 **Tech Stack:** Python 3.11+, FastAPI, Strands Agents SDK, boto3/DynamoDB, moto (unit test mocking), pytest, SST v3 (TypeScript infra)
+
+**Observed issues to fix in this plan:**
+- `backend/evals/braintrust/eval_output_quality.py` and `backend/evals/braintrust/eval_trajectory.py` call `Eval("Restaurant Booking — ...")`. In Braintrust's Python SDK, the `Eval` name is the Braintrust project name, so these create separate projects instead of using `Restaurant Booking Agent`.
+- `backend/scripts/create_braintrust_dataset.py` seeds datasets under `Restaurant Booking Agent`, but the eval scripts currently inline case lists instead of reading the managed datasets they seed. That leaves the UI datasets and the executed eval inputs drifting apart.
+- The runtime and evals still use the local `SYSTEM_PROMPT` string directly. There is no pushed Braintrust prompt, no stable slug, and no way to select a prompt `version` or `environment`, so prompt versioning is not actually implemented yet.
+- `backend/conftest.py` and `backend/tests/conftest.py` are duplicated. That is not breaking today, but it is a drift risk and should be consolidated while touching the test harness.
 
 ---
 
@@ -28,6 +34,18 @@
 | `backend/tests/integration/test_repositories.py` | Remove `restaurant_name` arg from all `get`/`delete` calls |
 | `backend/evals/cases.py` | Add `safety-userid-injection` eval case; update `happy-path-booking-in-range` expected |
 | `backend/tests/unit/test_cases.py` | Update `OUTPUT_QUALITY_CASES` count: 11 → 12 |
+| `backend/evals/braintrust/config.py` | **New** — single source of truth for Braintrust project, dataset, prompt, and environment constants |
+| `backend/evals/braintrust/eval_output_quality.py` | Use shared Braintrust config and managed dataset/project naming |
+| `backend/evals/braintrust/eval_trajectory.py` | Use shared Braintrust config and managed dataset/project naming |
+| `backend/scripts/create_braintrust_dataset.py` | Use shared Braintrust config instead of hard-coded project/dataset names |
+| `backend/app/instrumentation.py` | Read the canonical Braintrust project constant instead of embedding a string literal |
+| `backend/app/agent/prompt_loader.py` | **New** — load a Braintrust-managed prompt by slug, version, or environment with safe local fallback |
+| `backend/braintrust/prompts/restaurant_booking_agent.py` | **New** — Braintrust prompt definition to push with `braintrust push` |
+| `backend/tests/unit/agent/test_prompt_loader.py` | **New** — verify prompt loading, fallback, and version/environment selection |
+| `backend/tests/unit/evals/test_braintrust_config.py` | **New** — assert one canonical project name and stable dataset/prompt slugs |
+| `backend/conftest.py` | Keep the single root pytest bootstrap file |
+| `backend/tests/conftest.py` | Delete after consolidating duplicate root test bootstrap logic |
+| `package.json` | Add scripts for seeding Braintrust datasets, pushing prompts, and fast non-agent verification |
 
 ---
 
@@ -632,4 +650,417 @@ git commit -m "fix(agent): clean up booking rules after tool param fixes
 Rule 4: remove redundant 'user ID is not required' note — the tool no longer
 exposes user_id so the agent cannot ask for it regardless.
 Rule 5: unchanged — still explicitly prevents asking for restaurant_name."
+```
+
+---
+
+## Task 6: Unify Braintrust Project Naming Across Traces, Datasets, and Eval Runs
+
+**Files:**
+- Create: `backend/evals/braintrust/config.py`
+- Modify: `backend/evals/braintrust/eval_output_quality.py`
+- Modify: `backend/evals/braintrust/eval_trajectory.py`
+- Modify: `backend/scripts/create_braintrust_dataset.py`
+- Modify: `backend/app/instrumentation.py`
+- Test: `backend/tests/unit/evals/test_braintrust_config.py`
+
+- [ ] **Step 1: Create a shared Braintrust config module**
+
+Create `backend/evals/braintrust/config.py` with the canonical names:
+
+```python
+"""Shared Braintrust naming/configuration for traces, datasets, prompts, and evals."""
+
+BRAINTRUST_PROJECT = "Restaurant Booking Agent"
+
+OUTPUT_QUALITY_DATASET = "restaurant-agent-output-quality"
+TRAJECTORY_DATASET = "restaurant-agent-trajectory"
+
+SYSTEM_PROMPT_NAME = "Restaurant Booking Agent System Prompt"
+SYSTEM_PROMPT_SLUG = "restaurant-booking-agent-system"
+
+DEFAULT_PROMPT_ENVIRONMENT = "development"
+```
+
+Keep this file dependency-light so both runtime and scripts can import it safely.
+
+- [ ] **Step 2: Update both Braintrust eval scripts to use the canonical project**
+
+In:
+- `backend/evals/braintrust/eval_output_quality.py`
+- `backend/evals/braintrust/eval_trajectory.py`
+
+Import `BRAINTRUST_PROJECT` and pass it to `Eval(...)` instead of the current hard-coded `"Restaurant Booking — Output Quality"` / `"Restaurant Booking — Trajectory"` names.
+
+Keep the human-readable run label in `experiment_name`, not the project name:
+
+```python
+Eval(
+    BRAINTRUST_PROJECT,
+    ...,
+    experiment_name=_experiment_name,
+)
+```
+
+Also add `project_name: BRAINTRUST_PROJECT` into each eval's metadata payload so the resulting records are self-describing in exports.
+
+- [ ] **Step 3: Remove hard-coded Braintrust project strings elsewhere**
+
+Update:
+- `backend/scripts/create_braintrust_dataset.py`
+- `backend/app/instrumentation.py`
+
+Both files should import `BRAINTRUST_PROJECT` from the shared config module instead of embedding `"Restaurant Booking Agent"` inline.
+
+This ensures traces, datasets, and evals all resolve to exactly the same Braintrust project string.
+
+- [ ] **Step 4: Add a unit test that guards against project-name drift**
+
+Create `backend/tests/unit/evals/test_braintrust_config.py`:
+
+```python
+from evals.braintrust.config import (
+    BRAINTRUST_PROJECT,
+    OUTPUT_QUALITY_DATASET,
+    SYSTEM_PROMPT_SLUG,
+    TRAJECTORY_DATASET,
+)
+
+
+def test_braintrust_project_name_is_canonical():
+    assert BRAINTRUST_PROJECT == "Restaurant Booking Agent"
+
+
+def test_braintrust_dataset_names_are_stable():
+    assert OUTPUT_QUALITY_DATASET == "restaurant-agent-output-quality"
+    assert TRAJECTORY_DATASET == "restaurant-agent-trajectory"
+
+
+def test_braintrust_prompt_slug_is_stable():
+    assert SYSTEM_PROMPT_SLUG == "restaurant-booking-agent-system"
+```
+
+- [ ] **Step 5: Verify no stray Braintrust project names remain in executable code**
+
+Run:
+
+```bash
+rg -n 'Restaurant Booking — Output Quality|Restaurant Booking — Trajectory|project="Restaurant Booking Agent"|project_name:Restaurant Booking Agent' backend
+```
+
+Expected:
+- No matches for the two old `Eval(...)` project names.
+- Only canonical shared-config usage remains for the project string.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add backend/evals/braintrust/config.py \
+        backend/evals/braintrust/eval_output_quality.py \
+        backend/evals/braintrust/eval_trajectory.py \
+        backend/scripts/create_braintrust_dataset.py \
+        backend/app/instrumentation.py \
+        backend/tests/unit/evals/test_braintrust_config.py
+git commit -m "refactor(braintrust): centralize project naming across traces and evals
+
+Use one shared Braintrust project constant so traces, datasets, and both eval
+entrypoints all land under Restaurant Booking Agent instead of creating
+multiple projects from mismatched Eval names."
+```
+
+---
+
+## Task 7: Make Managed Braintrust Datasets the Executed Eval Source of Truth
+
+**Files:**
+- Modify: `backend/evals/braintrust/eval_output_quality.py`
+- Modify: `backend/evals/braintrust/eval_trajectory.py`
+- Modify: `backend/scripts/create_braintrust_dataset.py`
+- Modify: `package.json`
+
+- [ ] **Step 1: Update the dataset seeding script to use shared constants**
+
+In `backend/scripts/create_braintrust_dataset.py`, replace the inline dataset names with imports from `evals.braintrust.config`:
+
+```python
+from evals.braintrust.config import (
+    BRAINTRUST_PROJECT,
+    OUTPUT_QUALITY_DATASET,
+    TRAJECTORY_DATASET,
+)
+```
+
+Use those constants in both `braintrust.init_dataset(...)` and the CLI output strings.
+
+- [ ] **Step 2: Change both eval scripts to load the managed datasets**
+
+Instead of adapting `OUTPUT_QUALITY_CASES` / `TRAJECTORY_CASES` inline inside each `Eval(...)`, initialise the dataset and use it as `data`.
+
+Sketch:
+
+```python
+import braintrust
+
+from evals.braintrust.config import (
+    BRAINTRUST_PROJECT,
+    OUTPUT_QUALITY_DATASET,
+)
+
+dataset = braintrust.init_dataset(
+    project=BRAINTRUST_PROJECT,
+    name=OUTPUT_QUALITY_DATASET,
+)
+
+Eval(
+    BRAINTRUST_PROJECT,
+    data=dataset,
+    ...,
+)
+```
+
+Do the equivalent for the trajectory eval.
+
+The goal is that the dataset users see in the Braintrust UI is the exact dataset the evals run against, not a second inline copy.
+
+- [ ] **Step 3: Keep `evals/cases.py` as the authoring source, but document the sync step**
+
+Do not delete `evals/cases.py`. It remains the version-controlled authoring source.
+
+Instead, update the script docstrings and package scripts so the intended workflow is:
+1. Edit `evals/cases.py`
+2. Run the dataset seed script
+3. Run the Braintrust evals against the managed datasets
+
+- [ ] **Step 4: Add package scripts for the managed dataset workflow**
+
+In `package.json`, add:
+
+```json
+{
+  "scripts": {
+    "eval:braintrust:seed": "cd backend && uv run python scripts/create_braintrust_dataset.py",
+    "braintrust:push:prompts": "cd backend && uv run braintrust push --env-file .env braintrust/prompts/restaurant_booking_agent.py"
+  }
+}
+```
+
+Keep the existing eval scripts unchanged apart from their new dataset-backed behavior.
+
+- [ ] **Step 5: Verify the dataset workflow manually**
+
+Run:
+
+```bash
+cd backend && uv run python scripts/create_braintrust_dataset.py
+cd backend && uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_output_quality.py
+cd backend && uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_trajectory.py
+```
+
+Expected:
+- Both datasets are seeded into the `Restaurant Booking Agent` project.
+- Both eval runs execute under that same project.
+- Braintrust UI no longer shows separate eval projects for output quality vs trajectory.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add backend/evals/braintrust/eval_output_quality.py \
+        backend/evals/braintrust/eval_trajectory.py \
+        backend/scripts/create_braintrust_dataset.py \
+        package.json
+git commit -m "refactor(evals): run Braintrust evals against managed datasets
+
+Keep evals/cases.py as the authoring source, seed named Braintrust datasets
+from it, and execute the Braintrust evals against those same datasets so the
+UI and local source of truth stay aligned."
+```
+
+---
+
+## Task 8: Add Braintrust Prompt Versioning and Optional Runtime Prompt Loading
+
+**Files:**
+- Create: `backend/braintrust/prompts/restaurant_booking_agent.py`
+- Create: `backend/app/agent/prompt_loader.py`
+- Modify: `backend/app/agent/prompts.py`
+- Modify: `backend/app/agent/core.py`
+- Modify: `backend/app/api/routes/chat.py`
+- Modify: `backend/evals/braintrust/eval_output_quality.py`
+- Modify: `backend/evals/braintrust/eval_trajectory.py`
+- Test: `backend/tests/unit/agent/test_prompt_loader.py`
+
+- [ ] **Step 1: Create the Braintrust prompt definition file**
+
+Create `backend/braintrust/prompts/restaurant_booking_agent.py`:
+
+```python
+import braintrust
+
+from app.agent.prompts import SYSTEM_PROMPT
+from evals.braintrust.config import (
+    BRAINTRUST_PROJECT,
+    SYSTEM_PROMPT_NAME,
+    SYSTEM_PROMPT_SLUG,
+)
+
+project = braintrust.projects.create(name=BRAINTRUST_PROJECT)
+
+project.prompts.create(
+    name=SYSTEM_PROMPT_NAME,
+    slug=SYSTEM_PROMPT_SLUG,
+    description="System prompt for the Restaurant Booking Agent",
+    model="bedrock/us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+    messages=[{"role": "system", "content": SYSTEM_PROMPT}],
+    if_exists="replace",
+)
+```
+
+Important:
+- Use one stable slug so Braintrust's built-in versioning tracks revisions over time.
+- Keep `if_exists="replace"` so repeated pushes create new prompt versions instead of proliferating prompt slugs.
+
+- [ ] **Step 2: Create a runtime prompt loader with explicit version/environment support**
+
+Create `backend/app/agent/prompt_loader.py` that:
+- reads `BRAINTRUST_PROMPT_VERSION` and `BRAINTRUST_PROMPT_ENVIRONMENT` from the environment
+- calls `braintrust.load_prompt(...)` with `project=BRAINTRUST_PROJECT`, `slug=SYSTEM_PROMPT_SLUG`, and optional `version` / `environment`
+- calls `.build()` and extracts the first system message's content
+- falls back to the local `SYSTEM_PROMPT` string if Braintrust prompt loading is disabled or fails locally
+
+Keep the fallback explicit and logged. Local development must keep working even when Braintrust prompt access is unavailable.
+
+- [ ] **Step 3: Switch agent construction to use the loader**
+
+Update:
+- `backend/app/agent/core.py`
+- `backend/app/api/routes/chat.py`
+- `backend/evals/braintrust/eval_output_quality.py`
+- `backend/evals/braintrust/eval_trajectory.py`
+
+Replace direct `system_prompt=SYSTEM_PROMPT` wiring with the loader function so runtime and Braintrust evals use the same prompt-selection path.
+
+Do **not** switch the Strands local evals yet; leave them on the local prompt until the Braintrust-backed path is proven stable.
+
+- [ ] **Step 4: Add unit tests for prompt selection behavior**
+
+Create `backend/tests/unit/agent/test_prompt_loader.py` covering:
+- local fallback when no Braintrust prompt env vars are set
+- passing `version` when `BRAINTRUST_PROMPT_VERSION` is set
+- passing `environment` when only `BRAINTRUST_PROMPT_ENVIRONMENT` is set
+- preferring `version` over `environment`
+- rejecting a loaded prompt if it does not compile to exactly one system message
+
+Mock `braintrust.load_prompt` in every test. These must be fast, deterministic unit tests.
+
+- [ ] **Step 5: Push the initial managed prompt and document the workflow**
+
+Run:
+
+```bash
+cd backend && uv run braintrust push --env-file .env braintrust/prompts/restaurant_booking_agent.py
+```
+
+Expected:
+- Braintrust creates or updates one prompt under the `Restaurant Booking Agent` project.
+- Future prompt edits create new versions under the same slug instead of new prompt records.
+
+- [ ] **Step 6: Verify explicit version/environment resolution**
+
+Run two manual checks:
+
+```bash
+cd backend && BRAINTRUST_PROMPT_ENVIRONMENT=development uv run python -c "from app.agent.prompt_loader import load_system_prompt; print(load_system_prompt()[:80])"
+cd backend && BRAINTRUST_PROMPT_VERSION=1 uv run python -c "from app.agent.prompt_loader import load_system_prompt; print(load_system_prompt()[:80])"
+```
+
+Expected:
+- Both commands return prompt text successfully.
+- The code path accepts either an environment or an explicit version, with version taking precedence.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add backend/braintrust/prompts/restaurant_booking_agent.py \
+        backend/app/agent/prompt_loader.py \
+        backend/app/agent/prompts.py \
+        backend/app/agent/core.py \
+        backend/app/api/routes/chat.py \
+        backend/evals/braintrust/eval_output_quality.py \
+        backend/evals/braintrust/eval_trajectory.py \
+        backend/tests/unit/agent/test_prompt_loader.py \
+        package.json
+git commit -m "feat(braintrust): add managed prompt versioning and runtime prompt loading
+
+Push the agent system prompt to Braintrust under a stable slug, support loading
+by version or environment at runtime, and keep a local fallback so prompt
+versioning works without breaking local development."
+```
+
+---
+
+## Task 9: Consolidate Test Bootstrap and Tighten Verification
+
+**Files:**
+- Modify: `backend/conftest.py`
+- Delete: `backend/tests/conftest.py`
+- Modify: `package.json`
+
+- [ ] **Step 1: Consolidate duplicated root conftest logic**
+
+Keep `backend/conftest.py` as the single root pytest bootstrap file and delete `backend/tests/conftest.py`.
+
+Before deleting, confirm the files are identical. They currently both:
+- load `.env`
+- stub `sst`
+- patch `app.instrumentation.setup`
+- patch `app.instrumentation.flush`
+
+- [ ] **Step 2: Add a deterministic verification command**
+
+The broad command `uv run pytest evals tests -q` is not a good default integrity check because `evals/strands/test_agent_evals.py` is marked `agent` and makes real Bedrock calls.
+
+Add a fast script in `package.json`:
+
+```json
+{
+  "scripts": {
+    "test:backend:fast": "cd backend && uv run pytest tests/unit tests/integration -q -m 'not agent'"
+  }
+}
+```
+
+Keep the existing manual Braintrust and Strands eval scripts for the expensive online checks.
+
+- [ ] **Step 3: Verification checklist before closing the branch**
+
+Run, in this order:
+
+```bash
+cd backend && uv run ruff check app evals scripts tests
+cd backend && uv run python -m compileall app evals scripts
+cd backend && uv run pytest tests/unit tests/integration -q -m 'not agent'
+cd backend && uv run python scripts/create_braintrust_dataset.py
+cd backend && uv run braintrust push --env-file .env braintrust/prompts/restaurant_booking_agent.py
+cd backend && uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_output_quality.py
+cd backend && uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_trajectory.py
+```
+
+Expected:
+- lint passes
+- compileall passes
+- non-agent pytest suite passes
+- datasets seed into the canonical Braintrust project
+- one prompt slug is updated with a new version
+- both Braintrust evals run under the same project
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add backend/conftest.py package.json
+git rm backend/tests/conftest.py
+git commit -m "chore(test): consolidate pytest bootstrap and clarify fast verification path
+
+Remove duplicated conftest setup and add a fast non-agent verification command
+so everyday integrity checks stay deterministic while online evals remain
+explicit manual steps."
 ```
