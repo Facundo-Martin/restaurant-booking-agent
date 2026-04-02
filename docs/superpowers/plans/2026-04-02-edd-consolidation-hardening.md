@@ -24,6 +24,9 @@ Every Braintrust experiment should record that tuple explicitly and fail closed 
 - Braintrust Python SDK reference: https://www.braintrust.dev/docs/reference/sdks/python
 - Braintrust prompts guide: https://www.braintrust.dev/docs/guides/functions/prompts
 - Braintrust prompt versioning article: https://www.braintrust.dev/articles/what-is-prompt-versioning
+- Braintrust evaluating agents guide: https://www.braintrust.dev/docs/best-practices/agents
+- Braintrust evaluate systematically guide: https://www.braintrust.dev/docs/evaluate
+- Braintrust agent evaluation article: https://www.braintrust.dev/articles/agent-evaluation
 
 ---
 
@@ -41,6 +44,9 @@ Every Braintrust experiment should record that tuple explicitly and fail closed 
 | `backend/evals/cases.py` | Add optional rubric/provenance metadata and stricter typing for case categories |
 | `backend/evals/scorers/output_quality_scorer.py` | Remove `expected` prose as a factual source; version the rubric explicitly |
 | `backend/evals/scorers/trajectory_scorer.py` | Add explicit scorer version metadata and stricter result schema |
+| `backend/evals/workflows/` | **New** — multi-turn workflow fixtures for cancellation and rescheduling |
+| `backend/evals/braintrust/eval_cancellation_flow.py` | **New** — multi-turn authorization-aware cancellation eval |
+| `backend/evals/scorers/workflow_scorer.py` | **New** — stepwise invariants for confirmation, ownership, and destructive tools |
 | `backend/app/agent/prompt_loader.py` | Return structured prompt metadata, not just prompt text; cache loaded prompts |
 | `backend/app/api/routes/chat.py` | Emit prompt provenance in traces/logs for runtime observability |
 | `backend/braintrust/prompts/restaurant_booking_agent.py` | Add prompt metadata/version labels and comments about deployment workflow |
@@ -51,6 +57,10 @@ Every Braintrust experiment should record that tuple explicitly and fail closed 
 | `backend/tests/unit/evals/test_datasets.py` | **New** — dataset preflight and parity tests |
 | `backend/tests/unit/evals/test_manifest.py` | **New** — provenance serialization tests |
 | `backend/tests/unit/evals/test_output_quality_scorer.py` | **New** — judge prompt contract tests |
+| `backend/tests/unit/evals/test_workflow_scorer.py` | **New** — multi-turn workflow scorer tests |
+| `backend/tests/integration/test_agent.py` | Expand with authorization-aware cancellation/rescheduling regression tests |
+| `backend/app/repositories/bookings.py` | Evolve read/delete/update operations to enforce booking ownership |
+| `backend/app/tools/bookings.py` | Return ownership-safe results; add reschedule tool when supported |
 | `package.json` | Add explicit preflight and CI eval commands |
 | `.github/workflows/` | **Potential new files** — CI split between fast checks and eval gating |
 
@@ -95,6 +105,17 @@ When this plan is complete:
    - seed
    - push prompts
    - run evals
+
+6. Destructive booking flows are authorization-safe:
+   - booking lookup, cancellation, and future rescheduling operate only on bookings
+     owned by the authenticated user
+   - workflows do not reveal whether another user's booking exists
+   - destructive tools only fire after both ownership validation and explicit user
+     confirmation
+
+7. The eval architecture covers both:
+   - single-turn policy checks (fast regression guards)
+   - multi-turn workflow checks (end-to-end confirmation and authorization flows)
 
 ---
 
@@ -487,7 +508,214 @@ If the workflow file is not added in this branch, omit it from the commit.
 
 ---
 
-## Task 7: Verification and Acceptance Criteria
+## Task 7: Add Multi-Turn, Authorization-Aware Workflow Evals
+
+**Why this task exists:**
+- The current eval suite is strong on single-turn policy checks, but cancellation and
+  rescheduling are actually workflow problems, not single-message problems.
+- A realistic booking cancellation flow may need to:
+  1. verify the booking exists
+  2. verify the booking belongs to the authenticated user
+  3. ask the user for confirmation
+  4. only then perform the destructive action
+- That behavior is hard to encode cleanly in the current single-turn trajectory cases.
+- Braintrust's agent-evaluation guidance explicitly recommends evaluating both the
+  complete end-to-end task flow and the intermediate steps, and notes that `hooks`
+  metadata can capture intermediate tool calls for scorers.
+
+**Files:**
+- Create: `backend/evals/workflows/cancellation_cases.py`
+- Create: `backend/evals/braintrust/eval_cancellation_flow.py`
+- Create: `backend/evals/scorers/workflow_scorer.py`
+- Create: `backend/tests/unit/evals/test_workflow_scorer.py`
+- Modify: `backend/evals/cases.py`
+- Modify: `backend/app/repositories/bookings.py`
+- Modify: `backend/app/tools/bookings.py`
+- Modify: `backend/tests/integration/test_agent.py`
+
+- [ ] **Step 1: Define the product policy explicitly**
+
+Before implementation, choose and document one cancellation policy:
+
+1. `lookup_then_confirm` (recommended)
+   - call `get_booking_details`
+   - verify the booking belongs to the authenticated user
+   - ask for yes/no confirmation
+   - call `delete_booking` only after confirmation
+
+2. `confirm_then_lookup`
+   - ask for confirmation first
+   - only then perform lookup + ownership verification + deletion
+
+Recommendation: adopt `lookup_then_confirm` because it avoids asking the user to
+confirm an action against a booking that may not exist or may not belong to them.
+
+- [ ] **Step 2: Make booking operations ownership-aware at the repository/tool layer**
+
+The authorization boundary must live in code, not just in prompts.
+
+Target direction:
+
+```python
+def get_for_user(booking_id: str, user_id: str) -> Booking | None:
+    booking = get(booking_id)
+    if booking is None or booking.user_id != user_id:
+        return None
+    return booking
+
+
+def delete_for_user(booking_id: str, user_id: str) -> bool:
+    booking = get_for_user(booking_id, user_id)
+    if booking is None:
+        return False
+    return delete(booking_id)
+```
+
+Then the tool layer should expose only ownership-safe outcomes. If a booking does
+not belong to the caller, return the same not-found-style response used for a
+nonexistent booking to avoid leaking cross-user existence.
+
+- [ ] **Step 3: Introduce multi-turn workflow fixtures**
+
+Create workflow-style fixtures that model full conversational state, not just a
+single message. At minimum:
+
+- `cancel-existing-booking-confirm-yes`
+- `cancel-existing-booking-confirm-no`
+- `cancel-missing-booking`
+- `cancel-other-users-booking`
+- `reschedule-existing-booking-confirm-yes`
+- `reschedule-other-users-booking`
+
+Suggested shape:
+
+```python
+@dataclass(frozen=True)
+class WorkflowTurn:
+    role: str
+    content: str
+
+
+@dataclass(frozen=True)
+class WorkflowCase:
+    id: str
+    turns: list[WorkflowTurn]
+    expected_tool_sequence: list[str]
+    metadata: dict[str, object] = field(default_factory=dict)
+```
+
+Use these workflow fixtures alongside, not instead of, the current single-turn
+cases. Single-turn checks remain useful as fast regression gates.
+
+- [ ] **Step 4: Build a Braintrust workflow eval harness**
+
+Create `backend/evals/braintrust/eval_cancellation_flow.py` that:
+- replays the conversation turn-by-turn
+- preserves agent state across turns
+- captures intermediate tool calls and state transitions
+- stores those tool calls in `hooks.metadata`
+
+Illustrative shape:
+
+```python
+async def task(case: WorkflowCase, hooks):
+    transcript = []
+    tool_calls = []
+
+    agent = make_eval_agent()
+
+    for turn in case.turns:
+        if turn.role != "user":
+            continue
+        response = await agent.invoke_async(turn.content)
+        transcript.append({"role": "user", "content": turn.content})
+        transcript.append({"role": "assistant", "content": str(response)})
+        tool_calls.extend(extract_tool_calls(agent.messages))
+
+    hooks.metadata["tool_calls"] = tool_calls
+    hooks.metadata["transcript"] = transcript
+    return {"output": transcript[-1]["content"], "tool_calls": tool_calls}
+```
+
+This follows Braintrust's recommendation to evaluate both the complete task flow
+and the intermediate steps, with `hooks.metadata` carrying the intermediate
+artifacts that scorers need.
+
+- [ ] **Step 5: Add invariant-based workflow scorers**
+
+Create `workflow_scorer.py` to enforce the actual business/security rules:
+
+- `delete_booking` must never fire before explicit confirmation
+- `delete_booking` must not fire on a `"no"` response
+- `get_booking_details` may be required before destructive actions if policy is
+  `lookup_then_confirm`
+- destructive tools must not operate on bookings owned by a different user
+- cross-user access attempts must not leak booking details
+
+Illustrative invariant:
+
+```python
+def assert_delete_after_confirmation(tool_calls: list[str], transcript: list[dict]) -> None:
+    delete_index = tool_calls.index("delete_booking")
+    assert any(
+        turn["role"] == "user" and turn["content"].lower() in {"yes", "yes, cancel it"}
+        for turn in transcript[: delete_index + 1]
+    )
+```
+
+The exact implementation can be more robust, but the key idea is that multi-turn
+workflow scoring should encode invariants, not just exact strings.
+
+- [ ] **Step 6: Split single-turn vs workflow eval responsibilities**
+
+Refine `backend/evals/cases.py` so it clearly distinguishes:
+
+- single-turn policy/routing checks
+- multi-turn workflow checks
+
+Do not overload one case type to do both jobs. In practice:
+- keep trajectory/output-quality datasets for fast, simple checks
+- create dedicated workflow evals for cancellation/rescheduling conversations
+
+- [ ] **Step 7: Expand integration tests**
+
+Add integration tests that reflect the same security posture:
+
+- authenticated user can cancel their own booking after confirmation
+- authenticated user cannot cancel another user's booking
+- authenticated user cannot reschedule another user's booking
+- missing booking IDs and cross-user booking IDs return the same safe response shape
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add backend/evals/workflows \
+        backend/evals/braintrust/eval_cancellation_flow.py \
+        backend/evals/scorers/workflow_scorer.py \
+        backend/evals/cases.py \
+        backend/app/repositories/bookings.py \
+        backend/app/tools/bookings.py \
+        backend/tests/unit/evals/test_workflow_scorer.py \
+        backend/tests/integration/test_agent.py
+git commit -m "feat(evals): add multi-turn authorization-aware booking workflow evals"
+```
+
+**Source notes:**
+- Braintrust's agent-evaluation guidance recommends evaluating agents both
+  end-to-end and at each step, and explicitly describes using `hooks.metadata`
+  to surface intermediate tool calls for scorers.
+- Braintrust's evaluation guides emphasize that datasets, task functions, and
+  scorers should represent the real task flow you care about. Cancellation and
+  rescheduling are destructive, multi-step workflows, so they merit dedicated
+  workflow evals rather than being forced into a single-turn routing-only shape.
+- Sources:
+  - https://www.braintrust.dev/docs/best-practices/agents
+  - https://www.braintrust.dev/docs/evaluate
+  - https://www.braintrust.dev/articles/agent-evaluation
+
+---
+
+## Task 8: Verification and Acceptance Criteria
 
 - [ ] **Step 1: Unit verification**
 
