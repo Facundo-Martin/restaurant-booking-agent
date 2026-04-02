@@ -11,10 +11,10 @@ _TABLE_NAME = "test-bookings-table"
 
 @pytest.fixture()
 def dynamodb_table():
-    """Spin up a moto DynamoDB table and patch the repository's module-level _table.
+    """Spin up a moto DynamoDB table and patch the repository's module-level cache.
 
-    The repository initialises `_table` at import time, so we swap it out for
-    the duration of each test and restore the original on teardown.
+    The repository lazily caches the table handle, so we swap it out for the
+    duration of each test and restore the original on teardown.
     """
     with mock_aws():
         dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
@@ -29,7 +29,7 @@ def dynamodb_table():
             BillingMode="PAY_PER_REQUEST",
         )
 
-        original = _repo_module._table  # pylint: disable=protected-access
-        _repo_module._table = table  # pylint: disable=protected-access
+        original = _repo_module._TABLE_HANDLE  # pylint: disable=protected-access
+        _repo_module._TABLE_HANDLE = table  # pylint: disable=protected-access
         yield table
-        _repo_module._table = original  # pylint: disable=protected-access
+        _repo_module._TABLE_HANDLE = original  # pylint: disable=protected-access
