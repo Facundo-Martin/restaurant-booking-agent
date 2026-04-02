@@ -33,15 +33,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.10.8"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install backend dev dependencies
+        run: uv sync --frozen --group dev
+        working-directory: backend
+
       - name: Run evaluations
         uses: braintrustdata/eval-action@v1
         with:
           runtime: python
           package_manager: uv
           root: backend
-          paths: |
-            evals/braintrust/eval_output_quality.py
-            evals/braintrust/eval_trajectory.py
+          paths: evals/braintrust
           api_key: ${{ secrets.BRAINTRUST_API_KEY }}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
