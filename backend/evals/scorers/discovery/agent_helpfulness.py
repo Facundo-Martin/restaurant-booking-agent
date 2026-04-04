@@ -1,6 +1,11 @@
 """LLM-as-judge scorer: agent helpfulness."""
 
+import json
+
+import boto3
+
 from braintrust import Score
+from evals.scorers.discovery.prompts import HELPFULNESS_PROMPT
 
 
 async def agent_helpfulness_scorer(input: str, output: str, **kwargs) -> Score:
@@ -14,17 +19,9 @@ async def agent_helpfulness_scorer(input: str, output: str, **kwargs) -> Score:
     Returns:
         Score object with score 0-1 and reasoning
     """
-    import json
-
-    import boto3
-
-    # Load prompt template
-    with open("backend/evals/scorers/discovery/prompts/helpfulness.txt") as f:
-        helpfulness_prompt_template = f.read()
-
     bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
 
-    prompt = helpfulness_prompt_template.replace("{{input}}", input).replace(
+    prompt = HELPFULNESS_PROMPT.replace("{{input}}", input).replace(
         "{{output}}", output
     )
 
