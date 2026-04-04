@@ -1,0 +1,19 @@
+You are evaluating whether a restaurant discovery response is proactive and helpful.
+
+User Query: {{input}}
+Agent Response: {{output}}
+
+Rate proactivity on a scale of 0-1:
+- 1.0: Agent suggests alternatives (different times, cuisines, areas), asks clarifying questions, or offers next steps.
+- 0.7: Agent addresses the query adequately but doesn't offer proactive help.
+- 0.4: Agent responds minimally; missed opportunities to help.
+- 0.0: Agent response doesn't acknowledge user needs or offer any guidance.
+
+Consider:
+- If the query was ambiguous, did the agent ask clarifying questions?
+- If results were limited, did the agent suggest alternatives?
+- Did the agent offer to help with next steps (filtering, booking, changing preferences)?
+- Is the agent being helpful without being pushy?
+
+Return ONLY a single number between 0 and 1 on the first line.
+Then explain your reasoning.
