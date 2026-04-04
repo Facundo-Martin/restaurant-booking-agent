@@ -17,18 +17,18 @@ Run (from backend/ directory):
 import os
 
 from dotenv import load_dotenv
-from strands import Agent
-from strands import tool as strands_tool
-from strands.models import BedrockModel
-from strands_tools import retrieve as _real_retrieve
-
-from braintrust import Eval
 
 # Load SST resource stubs from .env before importing app modules
 load_dotenv()
 
+from strands import Agent  # noqa: E402
+from strands import tool as strands_tool  # noqa: E402
+from strands.models import BedrockModel  # noqa: E402
+from strands_tools import retrieve as _real_retrieve  # noqa: E402
+
 from app.agent.core import RETRY_STRATEGY, TOOLS  # noqa: E402
 from app.agent.prompt_loader import load_system_prompt_bundle  # noqa: E402
+from braintrust import Eval  # noqa: E402
 from evals.braintrust.config import (  # noqa: E402
     BRAINTRUST_PROJECT,
     DISCOVERY_DATASET,
@@ -50,7 +50,11 @@ from evals.scorers.discovery.agent_helpfulness import (  # noqa: E402
 from evals.scorers.discovery.agent_proactivity import (  # noqa: E402
     agent_proactivity_scorer,
 )
-from evals.scorers.discovery.rag_quality import rag_quality_scorer  # noqa: E402
+from evals.scorers.discovery.rag_quality import (  # noqa: E402
+    answer_relevancy_scorer,
+    context_relevancy_scorer,
+    faithfulness_scorer,
+)
 
 # ---------------------------------------------------------------------------
 # Dataset
@@ -78,7 +82,7 @@ _FAKE_RESTAURANTS = (
 
 
 @strands_tool
-def retrieve(query: str) -> str:
+def retrieve(query: str) -> str:  # noqa: A002
     """Search the knowledge base for restaurants."""
     return _FAKE_RESTAURANTS
 
@@ -137,7 +141,9 @@ Eval(
     data=_dataset,
     task=run_discovery_agent,
     scores=[
-        rag_quality_scorer,
+        context_relevancy_scorer,
+        faithfulness_scorer,
+        answer_relevancy_scorer,
         agent_helpfulness_scorer,
         agent_proactivity_scorer,
         tool_routing_correctness,

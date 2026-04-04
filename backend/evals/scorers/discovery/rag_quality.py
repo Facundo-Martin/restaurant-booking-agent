@@ -1,25 +1,26 @@
-"""RAG quality scorers for discovery feature."""
+"""RAG quality scorers — autoevals adapters for Braintrust signature."""
 
 from autoevals import AnswerRelevancy, ContextRelevancy, Faithfulness
 
-from braintrust import Score
 
-
-async def context_relevancy_scorer(input: str, output: str, **kwargs) -> Score:
-    """Score: is retrieved context relevant to the user query?"""
+def context_relevancy_scorer(output: str, **kwargs) -> dict:
+    """Wrapper: is retrieved context relevant to the user query?"""
     context = kwargs.get("context", "")
-    return ContextRelevancy()(input=input, output=output, context=context)
+    input_text = kwargs.get("input", "")
+    return ContextRelevancy()(input=input_text, output=output, context=context)
 
 
-async def faithfulness_scorer(input: str, output: str, **kwargs) -> Score:
-    """Score: does the answer stick to retrieved context (no hallucinations)?"""
+def faithfulness_scorer(output: str, **kwargs) -> dict:
+    """Wrapper: does the answer stick to retrieved context (no hallucinations)?"""
     context = kwargs.get("context", "")
-    return Faithfulness()(input=input, output=output, context=context)
+    input_text = kwargs.get("input", "")
+    return Faithfulness()(input=input_text, output=output, context=context)
 
 
-async def answer_relevancy_scorer(input: str, output: str, **kwargs) -> Score:
-    """Score: is the answer relevant to the user query?"""
-    return AnswerRelevancy()(input=input, output=output)
+def answer_relevancy_scorer(output: str, **kwargs) -> dict:
+    """Wrapper: is the answer relevant to the user query?"""
+    input_text = kwargs.get("input", "")
+    return AnswerRelevancy()(input=input_text, output=output)
 
 
 __all__ = [
