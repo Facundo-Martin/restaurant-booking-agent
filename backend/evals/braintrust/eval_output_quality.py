@@ -34,14 +34,13 @@ from braintrust import Eval
 load_dotenv()
 
 from app.agent.core import RETRY_STRATEGY, TOOLS  # noqa: E402
-from app.agent.prompt_loader import load_system_prompt  # noqa: E402
+from app.agent.prompt_loader import load_system_prompt_bundle  # noqa: E402
 from evals.braintrust.config import (  # noqa: E402
     BRAINTRUST_PROJECT,
     EVAL_AGENT_MODEL_ID,
     EVAL_JUDGE_MODEL_ID,
     OUTPUT_QUALITY_DATASET,
     OUTPUT_QUALITY_SCORER_VERSION,
-    SYSTEM_PROMPT_SLUG,
 )
 from evals.braintrust.datasets import (  # noqa: E402
     assert_case_count_matches,
@@ -100,6 +99,9 @@ def retrieve(query: str) -> str:
 # Replace the real retrieve in the tool list with the deterministic stub.
 _EVAL_TOOLS = [retrieve if t is _real_retrieve else t for t in TOOLS]
 
+# Load the prompt once for the entire eval run so all cases use the same snapshot.
+_PROMPT_BUNDLE = load_system_prompt_bundle()
+
 
 # ---------------------------------------------------------------------------
 # Task function
@@ -118,7 +120,7 @@ async def run_agent(input: str) -> str:  # noqa: A002
     agent = Agent(
         model=_AGENT_MODEL,
         tools=_EVAL_TOOLS,
-        system_prompt=load_system_prompt(),
+        system_prompt=_PROMPT_BUNDLE.text,
         callback_handler=None,
         retry_strategy=RETRY_STRATEGY,
     )
@@ -139,7 +141,9 @@ _experiment_name = f"output-quality-{_commit[:8]}"
 _metadata = EvalMetadata(
     project_name=BRAINTRUST_PROJECT,
     dataset_name=OUTPUT_QUALITY_DATASET,
-    prompt_slug=SYSTEM_PROMPT_SLUG,
+    prompt_slug=_PROMPT_BUNDLE.slug,
+    prompt_version=_PROMPT_BUNDLE.version,
+    prompt_environment=_PROMPT_BUNDLE.environment,
     agent_model_id=EVAL_AGENT_MODEL_ID,
     scorer_version=OUTPUT_QUALITY_SCORER_VERSION,
     commit=_commit,

@@ -15,6 +15,7 @@ BRAINTRUST_PROJECT = "Restaurant Booking Agent"
 # ---------------------------------------------------------------------------
 OUTPUT_QUALITY_DATASET = "restaurant-agent-output-quality"
 TRAJECTORY_DATASET = "restaurant-agent-trajectory"
+DISCOVERY_DATASET = "restaurant-agent-discovery"
 
 # ---------------------------------------------------------------------------
 # Prompt
@@ -41,3 +42,4 @@ EVAL_JUDGE_MODEL_ID = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 OUTPUT_QUALITY_SCORER_VERSION = "output-quality-v2"
 TRAJECTORY_SCORER_VERSION = "trajectory-v1"
 WORKFLOW_SCORER_VERSION = "workflow-v1"
+DISCOVERY_SCORER_VERSION = "discovery-v1"
