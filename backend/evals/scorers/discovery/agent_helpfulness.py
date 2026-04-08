@@ -29,6 +29,7 @@ async def agent_helpfulness_scorer(input: str, output: str, **kwargs) -> Score:
         modelId="us.anthropic.claude-3-5-haiku-20241022-v1:0",
         body=json.dumps(
             {
+                "anthropic_version": "bedrock-2023-05-31",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 500,
             }

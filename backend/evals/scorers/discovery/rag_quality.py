@@ -1,26 +1,50 @@
-"""RAG quality scorers — autoevals adapters for Braintrust signature."""
+"""RAG quality scorers — autoevals routed through Braintrust gateway."""
 
-from autoevals import AnswerRelevancy, ContextRelevancy, Faithfulness
+import os
+
+import openai
+from autoevals import AnswerRelevancy, ContextRelevancy, Faithfulness, init
+
+from evals.braintrust.config import EVAL_AUTOEVALS_MODEL
+
+# Route autoevals through Braintrust gateway using Gemini Flash (better rate limits).
+# BRAINTRUST_API_KEY is already set for eval runs — no extra env vars needed.
+init(
+    openai.AsyncOpenAI(
+        base_url="https://gateway.braintrust.dev",
+        api_key=os.environ.get("BRAINTRUST_API_KEY", ""),
+    )
+)
 
 
-def context_relevancy_scorer(output: str, **kwargs) -> dict:
+async def context_relevancy_scorer(output: str, **kwargs) -> dict:
     """Wrapper: is retrieved context relevant to the user query?"""
-    context = kwargs.get("context", "")
+    metadata = kwargs.get("metadata", {})
+    context = metadata.get("context", "")
     input_text = kwargs.get("input", "")
-    return ContextRelevancy()(input=input_text, output=output, context=context)
+    return await ContextRelevancy(model=EVAL_AUTOEVALS_MODEL).eval_async(
+        input=input_text, output=output, context=context
+    )
 
 
-def faithfulness_scorer(output: str, **kwargs) -> dict:
+async def faithfulness_scorer(output: str, **kwargs) -> dict:
     """Wrapper: does the answer stick to retrieved context (no hallucinations)?"""
-    context = kwargs.get("context", "")
+    metadata = kwargs.get("metadata", {})
+    context = metadata.get("context", "")
     input_text = kwargs.get("input", "")
-    return Faithfulness()(input=input_text, output=output, context=context)
+    return await Faithfulness(model=EVAL_AUTOEVALS_MODEL).eval_async(
+        input=input_text, output=output, context=context
+    )
 
 
-def answer_relevancy_scorer(output: str, **kwargs) -> dict:
+async def answer_relevancy_scorer(output: str, **kwargs) -> dict:
     """Wrapper: is the answer relevant to the user query?"""
+    metadata = kwargs.get("metadata", {})
+    context = metadata.get("context", "")
     input_text = kwargs.get("input", "")
-    return AnswerRelevancy()(input=input_text, output=output)
+    return await AnswerRelevancy(model=EVAL_AUTOEVALS_MODEL).eval_async(
+        input=input_text, output=output, context=context
+    )
 
 
 __all__ = [
