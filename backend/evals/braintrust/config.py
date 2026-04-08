@@ -31,8 +31,12 @@ DEFAULT_PROMPT_ENVIRONMENT = "development"
 # in app/agent/core.py so eval cost/latency is an explicit architectural choice.
 EVAL_AGENT_MODEL_ID = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 
-# Judge model used by the output-quality LLM-as-judge scorer.
+# Judge model used by the output-quality LLM-as-judge scorer (Bedrock cross-region inference).
 EVAL_JUDGE_MODEL_ID = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+
+# Model for autoevals RAG scorers — routed through Braintrust gateway.
+# Using Llama 3.1 8B via Bedrock inference profile (system-defined, no quota limits).
+EVAL_AUTOEVALS_MODEL = "us.meta.llama3-1-8b-instruct-v1:0"
 
 # ---------------------------------------------------------------------------
 # Scorer versions
