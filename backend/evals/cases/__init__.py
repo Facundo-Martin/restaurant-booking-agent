@@ -9,5 +9,6 @@ Packages:
 # Re-export existing cases for backward compatibility
 from evals.cases.agent_evals import OUTPUT_QUALITY_CASES, TRAJECTORY_CASES
 from evals.cases.common import EvalCase
+from evals.cases.discovery import DISCOVERY_CASES
 
-__all__ = ["EvalCase", "OUTPUT_QUALITY_CASES", "TRAJECTORY_CASES"]
+__all__ = ["EvalCase", "DISCOVERY_CASES", "OUTPUT_QUALITY_CASES", "TRAJECTORY_CASES"]

@@ -6,6 +6,13 @@ Test coverage: basic searches, filtered searches, ambiguous queries, edge cases.
 
 from evals.cases.common import EvalCase
 
+# Retrieved context (same for all test cases — simulates KB retrieval)
+_CONTEXT = (
+    "Available restaurants: Nonna's Hearth (Italian, open daily), "
+    "Bistro Parisienne (French, closed Mondays), "
+    "Sakura Garden (Japanese, open daily)."
+)
+
 DISCOVERY_CASES: list[EvalCase] = [
     # === BASIC SEARCHES (5 cases) ===
     EvalCase(
@@ -16,6 +23,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Call retrieve with a broad query. Return all available restaurants with names, cuisines, and hours.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "basic_search",
             "difficulty": "easy",
             "expected_tools": ["retrieve"],
@@ -31,6 +39,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Call retrieve with 'Italian restaurants'. Return 2-5 Italian restaurants with names, cuisines, hours.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "basic_search",
             "difficulty": "easy",
             "expected_tools": ["retrieve"],
@@ -46,6 +55,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Short query asking for options. Call retrieve and list available restaurants.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "basic_search",
             "difficulty": "easy",
             "expected_tools": ["retrieve"],
@@ -76,6 +86,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Formal request for dining options. Call retrieve and list restaurants comprehensively.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "basic_search",
             "difficulty": "easy",
             "expected_tools": ["retrieve"],
@@ -92,6 +103,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Call retrieve with 'Italian restaurants downtown'. Return 2-5 Italian restaurants with name, cuisine, hours, location.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "filtered_search",
             "difficulty": "medium",
             "expected_tools": ["retrieve"],
@@ -107,6 +119,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Query for vegetarian restaurants in midtown. Call retrieve and list vegetarian-friendly restaurants with details.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "filtered_search",
             "difficulty": "medium",
             "expected_tools": ["retrieve"],
@@ -122,6 +135,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Query for upscale restaurants. Call retrieve and list fine dining options with details.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "filtered_search",
             "difficulty": "medium",
             "expected_tools": ["retrieve"],
@@ -137,6 +151,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Query for Japanese restaurants with emphasis on quality. Call retrieve and list well-reviewed Japanese options.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "filtered_search",
             "difficulty": "medium",
             "expected_tools": ["retrieve"],
@@ -152,6 +167,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Query for casual restaurants with late hours. Call retrieve and list casual options that stay open late.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "filtered_search",
             "difficulty": "medium",
             "expected_tools": ["retrieve"],
@@ -168,6 +184,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Ambiguous query (no cuisine/location). Agent should either ask clarifying questions OR call retrieve with reasonable guess. Response should acknowledge ambiguity.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "ambiguous",
             "difficulty": "hard",
             "expected_tools": ["retrieve"],
@@ -183,6 +200,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Vague superlative (no context). Agent should ask for preferences OR suggest top-rated options. Acknowledge that 'best' is subjective.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "ambiguous",
             "difficulty": "hard",
             "expected_tools": ["retrieve"],
@@ -198,6 +216,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Vague and location-relative ('here'). Agent should ask for location or suggest popular options. Acknowledge vagueness.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "ambiguous",
             "difficulty": "hard",
             "expected_tools": ["retrieve"],
@@ -214,6 +233,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Query with typo (Itilian). Agent should handle gracefully - either correct the typo or still retrieve Italian restaurants.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "edge_case",
             "difficulty": "hard",
             "expected_tools": ["retrieve"],
@@ -229,6 +249,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Contradictory requirements (cheap vs luxurious). Agent should acknowledge the contradiction and either ask for clarification or suggest a compromise (moderate price).",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "edge_case",
             "difficulty": "hard",
             "expected_tools": ["retrieve"],
@@ -245,6 +266,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Extremely broad query. Agent should call retrieve and return all available restaurants, or ask for any filters to narrow down.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "boundary_case",
             "difficulty": "easy",
             "expected_tools": ["retrieve"],
@@ -260,6 +282,7 @@ DISCOVERY_CASES: list[EvalCase] = [
             "description": "Highly specific query (sushi + dietary + location). Agent should call retrieve and either find matching restaurants or acknowledge if no perfect match exists.",
         },
         metadata={
+            "context": _CONTEXT,
             "query_type": "boundary_case",
             "difficulty": "medium",
             "expected_tools": ["retrieve"],

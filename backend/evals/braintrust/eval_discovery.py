@@ -9,9 +9,9 @@ Run (from repo root):
     pnpm eval:braintrust:discovery
 
 Run (from backend/ directory):
-    uv run braintrust eval --env-file .env evals/braintrust/discovery.py
+    uv run braintrust eval --env-file .env evals/braintrust/eval_discovery.py
     # Local iteration — no upload:
-    uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/discovery.py
+    uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_discovery.py
 """
 
 import os
@@ -96,8 +96,8 @@ _PROMPT_BUNDLE = load_system_prompt_bundle()
 # ---------------------------------------------------------------------------
 
 
-async def run_discovery_agent(input: str) -> dict:  # noqa: A002
-    """Run the discovery agent and capture output + context + trace."""
+async def run_discovery_agent(input: str) -> str:  # noqa: A002
+    """Run the discovery agent and return the response text."""
     agent = Agent(
         model=_AGENT_MODEL,
         tools=_EVAL_TOOLS,
@@ -107,14 +107,7 @@ async def run_discovery_agent(input: str) -> dict:  # noqa: A002
     )
 
     response = await agent.invoke_async(input)
-
-    return {
-        "output": str(response),
-        "context": _FAKE_RESTAURANTS,  # Retrieved context for RAG scorers
-        "trace": {
-            "tool_calls": [],  # Placeholder; actual trace would come from agent
-        },
-    }
+    return str(response)
 
 
 # ---------------------------------------------------------------------------
