@@ -17,7 +17,7 @@
     "eval:braintrust:seed": "cd backend && uv run python scripts/create_braintrust_dataset.py",
     "eval:braintrust:quality": "pnpm eval:braintrust:seed && cd backend && uv run braintrust eval --env-file .env evals/braintrust/eval_output_quality.py",
     "eval:braintrust:trajectory": "pnpm eval:braintrust:seed && cd backend && uv run braintrust eval --env-file .env evals/braintrust/eval_trajectory.py",
-    "eval:braintrust:discovery": "pnpm eval:braintrust:seed && cd backend && uv run braintrust eval --env-file .env evals/braintrust/discovery.py",
+    "eval:braintrust:discovery": "pnpm eval:braintrust:seed && cd backend && uv run braintrust eval --env-file .env evals/braintrust/eval_discovery.py",
     "braintrust:push:prompts": "cd backend && uv run braintrust push --env-file .env braintrust/prompts/restaurant_booking_agent.py",
     "eval:strands:quality": "cd backend && uv run python -u evals/strands/output_quality_eval.py",
     "eval:strands:trajectory": "cd backend && uv run python -u evals/strands/trajectory_eval.py"

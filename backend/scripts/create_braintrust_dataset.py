@@ -27,10 +27,15 @@ load_dotenv()
 import braintrust  # noqa: E402
 from evals.braintrust.config import (  # noqa: E402
     BRAINTRUST_PROJECT,
+    DISCOVERY_DATASET,
     OUTPUT_QUALITY_DATASET,
     TRAJECTORY_DATASET,
 )
-from evals.cases import OUTPUT_QUALITY_CASES, TRAJECTORY_CASES  # noqa: E402
+from evals.cases import (  # noqa: E402
+    DISCOVERY_CASES,
+    OUTPUT_QUALITY_CASES,
+    TRAJECTORY_CASES,
+)
 
 
 def seed_dataset(name: str, cases: list) -> None:
@@ -65,7 +70,9 @@ if __name__ == "__main__":
     seed_dataset(OUTPUT_QUALITY_DATASET, OUTPUT_QUALITY_CASES)
     print()
     seed_dataset(TRAJECTORY_DATASET, TRAJECTORY_CASES)
+    print()
+    seed_dataset(DISCOVERY_DATASET, DISCOVERY_CASES)
     print(
-        "\nDone. Pin a dataset version by passing BRAINTRUST_OUTPUT_QUALITY_DATASET_VERSION "
-        "or BRAINTRUST_TRAJECTORY_DATASET_VERSION when running evals."
+        "\nDone. Pin a dataset version by passing BRAINTRUST_OUTPUT_QUALITY_DATASET_VERSION, "
+        "BRAINTRUST_TRAJECTORY_DATASET_VERSION, or BRAINTRUST_DISCOVERY_DATASET_VERSION when running evals."
     )
