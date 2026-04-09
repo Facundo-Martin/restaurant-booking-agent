@@ -8,7 +8,7 @@ Three evaluators:
 
 import re
 
-from agent import JUDGE_MODEL
+from agent import FAKE_RESTAURANTS, JUDGE_MODEL
 from strands_evals.evaluators import Evaluator, OutputEvaluator, TrajectoryEvaluator
 from strands_evals.types.evaluation import EvaluationData, EvaluationOutput
 
@@ -48,30 +48,34 @@ class PIIEvaluator(Evaluator):
 
 # Module-level evaluators (exported for use in eval.py)
 output_evaluator = OutputEvaluator(
-    rubric="""
+    rubric=f"""
 The agent is a restaurant discovery assistant. Evaluate the response on three dimensions:
 
 1. AnswerRelevancy: Does it answer the user's query?
-2. Faithfulness: Does it stick to the knowledge base without hallucinating restaurants?
+2. Faithfulness: Does it stick to the knowledge base without hallucinating?
 3. ContextRelevancy: Is the retrieved context appropriate for the query?
 
-Knowledge base context provided in metadata.
+KNOWLEDGE BASE (the complete list of restaurants available):
+{FAKE_RESTAURANTS}
+
+HALLUCINATION RULE: Any restaurant name or detail not listed above is hallucination.
+If ANY hallucination is detected, the score must be 0.0 regardless of other factors.
 
 Score 1.0 if the response:
 - Directly answers the user's question
-- Only mentions restaurants/details from the knowledge base
-- Uses relevant context appropriately
+- Only mentions restaurants from the KB above
+- No hallucinations whatsoever
 - Is clear and helpful
 
 Score 0.5 if the response:
 - Partially answers the query
-- Mostly uses KB data with minor hallucination
+- Mostly uses KB data correctly
 - Uses somewhat relevant context
 
 Score 0.0 if the response:
-- Hallucinates restaurants or details not in knowledge base
+- Contains ANY hallucinated restaurants or details
 - Does not address the user's query
-- Uses irrelevant or contradictory context
+- Misrepresents KB information
     """,
     include_inputs=True,
     model=JUDGE_MODEL,

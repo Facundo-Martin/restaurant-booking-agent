@@ -26,11 +26,20 @@ JUDGE_MODEL = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
 AGENT_SYSTEM_PROMPT = SYSTEM_PROMPT
 AGENT_RETRY_STRATEGY = RETRY_STRATEGY
 
-# Fake data
+# Fake knowledge base - expanded with multiple options per cuisine for testing
 FAKE_RESTAURANTS = (
-    "Available restaurants: Nonna's Hearth (Italian, open daily, accepts reservations), "
-    "Bistro Parisienne (French, closed Mondays, accepts reservations), "
-    "Sakura Garden (Japanese, open daily, accepts reservations)."
+    "Available restaurants:\n"
+    "1. Nonna's Hearth (Italian, open daily, accepts reservations, casual atmosphere)\n"
+    "2. Trattoria Roma (Italian, open Tue-Sun, accepts reservations, fine dining)\n"
+    "3. Luigi's Pasta House (Italian, open daily, walk-ins welcome, casual)\n"
+    "4. Bistro Parisienne (French, closed Mondays, accepts reservations, upscale)\n"
+    "5. Café Laurent (French, open daily, walk-ins welcome, casual)\n"
+    "6. Sakura Garden (Japanese, open daily, accepts reservations, modern)\n"
+    "7. Sushi Tsunami (Japanese, open daily, walk-ins welcome, casual)\n"
+    "8. The Garden Spot (Vegetarian, open daily, accepts reservations, upscale)\n"
+    "9. Green Bowl Café (Vegetarian, open daily, walk-ins welcome, casual)\n"
+    "10. Late Night Eats (Casual dining, open until midnight daily, walk-ins only, affordable)\n"
+    "11. Luxe Prime Steakhouse (Upscale steakhouse, closed Sundays, requires reservations, premium pricing)"
 )
 
 
