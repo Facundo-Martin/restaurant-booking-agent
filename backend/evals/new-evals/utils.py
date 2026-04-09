@@ -16,6 +16,7 @@ def save_report(
     ts: str,
     output_dir: Path,
     evaluator_names: list[str],
+    responses: dict[str, dict] | None = None,
 ) -> Path:
     """
     Save evaluation results to JSON with proper evaluator labeling.
@@ -26,11 +27,13 @@ def save_report(
         ts: Timestamp string for filename (format: YYYYMMDD_HHMMSS)
         output_dir: Directory to save the report file
         evaluator_names: List of evaluator names (must match report order)
+        responses: Dict mapping case names to {output, trajectory} dicts
 
     Returns:
         Path to the saved JSON report file
     """
     case_results: list[dict[str, Any]] = []
+    responses = responses or {}
 
     # Iterate through evaluators and label them correctly
     for idx, report in enumerate(reports):
@@ -45,17 +48,19 @@ def save_report(
             report.reasons,
             strict=True,
         ):
-            case_results.append(
-                {
-                    "name": case.name,
-                    "input": case.input,
-                    "expected_trajectory": case.expected_trajectory,
-                    "evaluator": evaluator_name,
-                    "score": score,
-                    "test_pass": test_pass,
-                    "reason": reason,
-                }
-            )
+            result_dict = {
+                "name": case.name,
+                "input": case.input,
+                "expected_trajectory": case.expected_trajectory,
+                "evaluator": evaluator_name,
+                "score": score,
+                "test_pass": test_pass,
+                "reason": reason,
+            }
+            # Include LLM output if available
+            if case.name in responses:
+                result_dict["llm_output"] = responses[case.name].get("output", "")
+            case_results.append(result_dict)
 
     data = {
         "timestamp": ts,

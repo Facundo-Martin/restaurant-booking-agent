@@ -73,10 +73,12 @@ async def main() -> None:
 
     # Rate limit to 1 concurrent to avoid Bedrock throttling
     _sem = asyncio.Semaphore(1)
+    responses: dict[str, dict] = {}  # Store outputs by case name
 
     async def _rate_limited(case: Case) -> dict:
         async with _sem:
             result = await get_discovery_response(case)
+            responses[case.name] = result  # Capture output for report
             await asyncio.sleep(1)  # Delay between cases to avoid throttling
             return result
 
@@ -90,7 +92,9 @@ async def main() -> None:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = Path("experiment_files")
     evaluator_names = [e.__class__.__name__ for e in EVALUATORS]
-    out_path = save_report(experiment, reports, ts, output_dir, evaluator_names)
+    out_path = save_report(
+        experiment, reports, ts, output_dir, evaluator_names, responses
+    )
     print(f"✅ Results saved to {out_path}\n")
 
     # Print summary and check pass rates
