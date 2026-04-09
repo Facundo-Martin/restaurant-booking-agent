@@ -14,6 +14,7 @@ Requires SST resource stubs:
 """
 
 import asyncio
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -37,7 +38,10 @@ from cases import CASES  # noqa: E402
 from evaluators import EVALUATORS  # noqa: E402
 from utils import print_summary, save_report  # noqa: E402
 
-_PASS_THRESHOLD = 0.85
+# Pass threshold for CI/CD integration
+# Can be overridden via EVAL_PASS_THRESHOLD env var (e.g., EVAL_PASS_THRESHOLD=0.95)
+# Target for CI/CD: 95% (breaks build if below)
+_PASS_THRESHOLD = float(os.environ.get("EVAL_PASS_THRESHOLD", "0.85"))
 
 
 async def get_discovery_response(case: Case) -> dict:

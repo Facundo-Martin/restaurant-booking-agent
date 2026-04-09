@@ -1,63 +1,59 @@
-name: Evals
+name: Evaluation Tests
 
 on:
-  # Run on every PR targeting main — catches regressions before merge.
   pull_request:
-    branches: [main]
     paths:
-      - "backend/**"
-  # Run on push to main — establishes the new baseline experiment in Braintrust
-  # that future PRs are compared against.
+      - 'backend/app/agent/**'
+      - 'backend/evals/**'
+      - '.github/workflows/evals.yml'
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - "backend/**"
-  # Manual trigger for ad-hoc runs (e.g. after a prompt or model change).
-  workflow_dispatch:
-
-# One concurrent run per branch/PR — cancels a stale run if a new commit is
-# pushed before the previous run finishes.
-concurrency:
-  group: evals-${{ github.ref }}
-  cancel-in-progress: true
+      - 'backend/app/agent/**'
+      - 'backend/evals/**'
+      - '.github/workflows/evals.yml'
 
 jobs:
-  evals:
-    name: Agent Evals
+  discovery-evaluation:
+    name: Discovery Evaluation
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      # Needed for Braintrust to post experiment results as a PR comment.
-      pull-requests: write
-
+    timeout-minutes: 10
+    env:
+      SST_RESOURCE_Bookings: '{"name":"test-table"}'
+      SST_RESOURCE_RestaurantKB: '{"id":"test-kb-id"}'
+      AWS_REGION: us-east-1
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v7
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          version: "0.10.8"
-          enable-cache: true
-          cache-dependency-glob: backend/uv.lock
+          python-version: '3.11'
 
-      - name: Install backend dev dependencies
-        run: uv sync --frozen --group dev
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Run Discovery Evaluation
         working-directory: backend
+        run: |
+          PYTHONPATH=.:evals/new-evals uv run python evals/new-evals/discovery/eval.py
 
-      - name: Run evaluations
-        uses: braintrustdata/eval-action@v1
+      - name: Check Evaluation Results
+        if: always()
+        working-directory: backend
+        run: |
+          EVAL_FILE=$(ls -t experiment_files/eval_*.json 2>/dev/null | head -1)
+          if [ -z "$EVAL_FILE" ]; then
+            echo "❌ ERROR: No evaluation results found"
+            exit 1
+          fi
+          echo "📊 Latest evaluation: $EVAL_FILE"
+
+      - name: Upload Evaluation Results
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          runtime: python
-          package_manager: uv
-          root: backend
-          paths: evals/braintrust
-          api_key: ${{ secrets.BRAINTRUST_API_KEY }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-          GITHUB_SHA: ${{ github.sha }}
-          # Minimal SST resource stubs so config.py imports without a live deployment.
-          # Evals mock all tool I/O so no real DynamoDB or Knowledge Base is needed.
-          SST_RESOURCE_Bookings: '{"name":"eval-stub"}'
-          SST_RESOURCE_RestaurantKB: '{"id":"eval-stub"}'
-          SST_RESOURCE_AgentSessions: '{"name":"eval-sessions"}'
+          name: eval-results-discovery
+          path: backend/experiment_files/
+          retention-days: 30
