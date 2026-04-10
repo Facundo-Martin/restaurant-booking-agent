@@ -1,34 +1,31 @@
-# backend/evals/braintrust/eval_trajectory.py
-"""Braintrust offline eval — tool trajectory (tool routing correctness).
+# backend/evals/braintrust/eval_output_quality.py
+"""Braintrust offline eval — output quality (clarification, safety, hallucination).
 
-The task function returns both the agent's text response and the actual tool
-trajectory (list of tool names called). The trajectory scorer then compares
-actual vs. expected deterministically — no LLM call, no cost.
+Runs all output-quality test cases through the booking agent and scores each
+response with the LLM-as-judge scorer (Bedrock Haiku).
 
 Copy backend/.env.example → backend/.env and fill in values, then run:
 
 Run (from repo root — recommended):
-    pnpm eval:braintrust:trajectory
+    pnpm eval:braintrust:quality
 
 Run (from backend/ directory):
     # --env-file handles BRAINTRUST_API_KEY auth and SST_RESOURCE_* stubs:
-    uv run braintrust eval --env-file .env evals/braintrust/eval_trajectory.py
+    uv run braintrust eval --env-file .env evals/braintrust/eval_output_quality.py
 
     # Local iteration — no upload:
-    uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_trajectory.py
+    uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_output_quality.py
 """
 
 import os
 from unittest.mock import MagicMock, patch
 
+from braintrust import Eval
 from dotenv import load_dotenv
 from strands import Agent
 from strands import tool as strands_tool
 from strands.models import BedrockModel
-from strands_evals.extractors import tools_use_extractor
 from strands_tools import retrieve as _real_retrieve
-
-from braintrust import Eval
 
 # Load SST resource stubs from .env before importing app modules.
 # The braintrust CLI runs this file in its own process; SST_RESOURCE_* vars
@@ -40,37 +37,43 @@ from app.agent.prompt_loader import load_system_prompt_bundle  # noqa: E402
 from evals.braintrust.config import (  # noqa: E402
     BRAINTRUST_PROJECT,
     EVAL_AGENT_MODEL_ID,
-    TRAJECTORY_DATASET,
-    TRAJECTORY_SCORER_VERSION,
+    EVAL_JUDGE_MODEL_ID,
+    OUTPUT_QUALITY_DATASET,
+    OUTPUT_QUALITY_SCORER_VERSION,
 )
 from evals.braintrust.datasets import (  # noqa: E402
     assert_case_count_matches,
     load_dataset,
 )
 from evals.braintrust.manifest import EvalMetadata  # noqa: E402
-from evals.cases import TRAJECTORY_CASES  # noqa: E402
-from evals.scorers.trajectory_scorer import trajectory_scorer  # noqa: E402
+from evals.braintrust.scorers.output_quality_scorer import (  # noqa: E402
+    booking_output_quality_scorer,
+)
+from evals.discovery.cases import OUTPUT_QUALITY_CASES  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Dataset — always latest, guarded against empty results and case drift
 # ---------------------------------------------------------------------------
-_dataset, _rows = load_dataset(BRAINTRUST_PROJECT, TRAJECTORY_DATASET, version=None)
-assert_case_count_matches(_rows, TRAJECTORY_CASES, TRAJECTORY_DATASET)
+_dataset, _rows = load_dataset(BRAINTRUST_PROJECT, OUTPUT_QUALITY_DATASET, version=None)
+assert_case_count_matches(_rows, OUTPUT_QUALITY_CASES, OUTPUT_QUALITY_DATASET)
 
 # ---------------------------------------------------------------------------
 # Agent model
 # ---------------------------------------------------------------------------
-# Haiku: higher Bedrock throughput limits than Sonnet 3.7, well-suited for
-# tool-routing correctness tests which don't require Sonnet-level reasoning.
+# Haiku: higher Bedrock throughput limits than Sonnet 3.7, still follows system
+# prompt rules reliably. Output-quality cases test behavioral compliance, not
+# generation quality differences between model tiers.
 _AGENT_MODEL = BedrockModel(
     model_id=EVAL_AGENT_MODEL_ID,
-    # temperature=0 for deterministic tool routing — evals must be repeatable.
+    # temperature=0 for deterministic responses — without it the agent
+    # inconsistently skips current_time, guesses the date from training
+    # context, and mis-validates the 60-day booking window.
     temperature=0,
     additional_request_fields={"thinking": {"type": "disabled"}},
 )
 
 # ---------------------------------------------------------------------------
-# Canned tool responses
+# Canned tool responses — deterministic, no real Knowledge Base calls
 # ---------------------------------------------------------------------------
 _FAKE_RESTAURANTS = (
     "Available restaurants: Nonna's Hearth (Italian, open daily, accepts reservations), "
@@ -104,8 +107,8 @@ _PROMPT_BUNDLE = load_system_prompt_bundle()
 # ---------------------------------------------------------------------------
 
 
-async def run_agent_with_trajectory(input: str) -> dict:  # noqa: A002
-    """Run the booking agent and return both the response and the tool trajectory."""
+async def run_agent(input: str) -> str:  # noqa: A002
+    """Run the booking agent with mocked external dependencies, return response."""
     mock_booking = MagicMock()
     mock_booking.model_dump.return_value = _FAKE_BOOKING
     mock_repo = MagicMock()
@@ -124,10 +127,7 @@ async def run_agent_with_trajectory(input: str) -> dict:  # noqa: A002
     with patch("app.tools.bookings.booking_repo", mock_repo):
         response = await agent.invoke_async(input)
 
-    actual_trajectory = tools_use_extractor.extract_agent_tools_used_from_messages(
-        agent.messages
-    )
-    return {"output": str(response), "trajectory": actual_trajectory}
+    return str(response)
 
 
 # ---------------------------------------------------------------------------
@@ -135,24 +135,25 @@ async def run_agent_with_trajectory(input: str) -> dict:  # noqa: A002
 # ---------------------------------------------------------------------------
 
 _commit = os.environ.get("GITHUB_SHA", "local")
-_experiment_name = f"trajectory-{_commit[:8]}"
+_experiment_name = f"output-quality-{_commit[:8]}"
 
 _metadata = EvalMetadata(
     project_name=BRAINTRUST_PROJECT,
-    dataset_name=TRAJECTORY_DATASET,
+    dataset_name=OUTPUT_QUALITY_DATASET,
     prompt_slug=_PROMPT_BUNDLE.slug,
     prompt_version=_PROMPT_BUNDLE.version,
     prompt_environment=_PROMPT_BUNDLE.environment,
     agent_model_id=EVAL_AGENT_MODEL_ID,
-    scorer_version=TRAJECTORY_SCORER_VERSION,
+    scorer_version=OUTPUT_QUALITY_SCORER_VERSION,
     commit=_commit,
+    judge_model_id=EVAL_JUDGE_MODEL_ID,
 )
 
 Eval(
     BRAINTRUST_PROJECT,
     data=_dataset,
-    task=run_agent_with_trajectory,
-    scores=[trajectory_scorer],
+    task=run_agent,
+    scores=[booking_output_quality_scorer],
     experiment_name=_experiment_name,
     max_concurrency=1,
     metadata=_metadata.to_metadata(),

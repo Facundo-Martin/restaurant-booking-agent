@@ -5,7 +5,7 @@ import json
 import boto3
 from braintrust import Score
 
-from evals.scorers.discovery.prompts import HELPFULNESS_PROMPT
+from evals.braintrust.scorers.discovery.prompts import HELPFULNESS_PROMPT
 
 
 async def agent_helpfulness_scorer(input: str, output: str, **kwargs) -> Score:

@@ -5,7 +5,7 @@ import json
 import boto3
 from braintrust import Score
 
-from evals.scorers.discovery.prompts import PROACTIVITY_PROMPT
+from evals.braintrust.scorers.discovery.prompts import PROACTIVITY_PROMPT
 
 
 async def agent_proactivity_scorer(input: str, output: str, **kwargs) -> Score:

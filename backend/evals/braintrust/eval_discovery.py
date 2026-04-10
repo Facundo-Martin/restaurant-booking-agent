@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 # Load SST resource stubs from .env before importing app modules
 load_dotenv()
 
+from braintrust import Eval  # noqa: E402
 from strands import Agent  # noqa: E402
 from strands import tool as strands_tool  # noqa: E402
 from strands.models import BedrockModel  # noqa: E402
@@ -28,7 +29,6 @@ from strands_tools import retrieve as _real_retrieve  # noqa: E402
 
 from app.agent.core import RETRY_STRATEGY, TOOLS  # noqa: E402
 from app.agent.prompt_loader import load_system_prompt_bundle  # noqa: E402
-from braintrust import Eval  # noqa: E402
 from evals.braintrust.config import (  # noqa: E402
     BRAINTRUST_PROJECT,
     DISCOVERY_DATASET,
@@ -41,20 +41,24 @@ from evals.braintrust.datasets import (  # noqa: E402
     load_dataset,
 )
 from evals.braintrust.manifest import EvalMetadata  # noqa: E402
-from evals.cases.discovery import DISCOVERY_CASES  # noqa: E402
-from evals.scorers.common.data_privacy import data_privacy_scorer  # noqa: E402
-from evals.scorers.common.tool_routing import tool_routing_correctness  # noqa: E402
-from evals.scorers.discovery.agent_helpfulness import (  # noqa: E402
+from evals.braintrust.scorers.common.data_privacy import (  # noqa: E402
+    data_privacy_scorer,
+)
+from evals.braintrust.scorers.common.tool_routing import (  # noqa: E402
+    tool_routing_correctness,
+)
+from evals.braintrust.scorers.discovery.agent_helpfulness import (  # noqa: E402
     agent_helpfulness_scorer,
 )
-from evals.scorers.discovery.agent_proactivity import (  # noqa: E402
+from evals.braintrust.scorers.discovery.agent_proactivity import (  # noqa: E402
     agent_proactivity_scorer,
 )
-from evals.scorers.discovery.rag_quality import (  # noqa: E402
+from evals.braintrust.scorers.discovery.rag_quality import (  # noqa: E402
     answer_relevancy_scorer,
     context_relevancy_scorer,
     faithfulness_scorer,
 )
+from evals.discovery.cases import DISCOVERY_CASES  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Dataset
