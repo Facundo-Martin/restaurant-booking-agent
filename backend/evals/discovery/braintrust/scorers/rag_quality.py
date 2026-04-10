@@ -5,7 +5,7 @@ import os
 import openai
 from autoevals import AnswerRelevancy, ContextRelevancy, Faithfulness, init
 
-from evals.braintrust.config import EVAL_AUTOEVALS_MODEL
+from evals.config.braintrust.config import EVAL_AUTOEVALS_MODEL
 
 # Route autoevals through Braintrust gateway using Gemini Flash (better rate limits).
 # BRAINTRUST_API_KEY is already set for eval runs — no extra env vars needed.

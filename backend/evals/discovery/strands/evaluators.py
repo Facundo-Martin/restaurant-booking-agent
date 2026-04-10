@@ -8,9 +8,10 @@ Three evaluators:
 
 import re
 
-from agent import FAKE_RESTAURANTS, JUDGE_MODEL
 from strands_evals.evaluators import Evaluator, OutputEvaluator, TrajectoryEvaluator
 from strands_evals.types.evaluation import EvaluationData, EvaluationOutput
+
+from evals.config.strands.agent import FAKE_RESTAURANTS, JUDGE_MODEL
 
 
 class PIIEvaluator(Evaluator):

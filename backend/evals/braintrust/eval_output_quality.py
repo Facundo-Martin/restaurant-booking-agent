@@ -34,19 +34,19 @@ load_dotenv()
 
 from app.agent.core import RETRY_STRATEGY, TOOLS  # noqa: E402
 from app.agent.prompt_loader import load_system_prompt_bundle  # noqa: E402
-from evals.braintrust.config import (  # noqa: E402
+from evals.config.braintrust.config import (  # noqa: E402
     BRAINTRUST_PROJECT,
     EVAL_AGENT_MODEL_ID,
     EVAL_JUDGE_MODEL_ID,
     OUTPUT_QUALITY_DATASET,
     OUTPUT_QUALITY_SCORER_VERSION,
 )
-from evals.braintrust.datasets import (  # noqa: E402
+from evals.config.braintrust.datasets import (  # noqa: E402
     assert_case_count_matches,
     load_dataset,
 )
-from evals.braintrust.manifest import EvalMetadata  # noqa: E402
-from evals.braintrust.scorers.output_quality_scorer import (  # noqa: E402
+from evals.config.braintrust.manifest import EvalMetadata  # noqa: E402
+from evals.config.braintrust.scorers.output_quality_scorer import (  # noqa: E402
     booking_output_quality_scorer,
 )
 from evals.discovery.cases import OUTPUT_QUALITY_CASES  # noqa: E402

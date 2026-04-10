@@ -29,31 +29,31 @@ from strands_tools import retrieve as _real_retrieve  # noqa: E402
 
 from app.agent.core import RETRY_STRATEGY, TOOLS  # noqa: E402
 from app.agent.prompt_loader import load_system_prompt_bundle  # noqa: E402
-from evals.braintrust.config import (  # noqa: E402
+from evals.config.braintrust.config import (  # noqa: E402
     BRAINTRUST_PROJECT,
     DISCOVERY_DATASET,
     DISCOVERY_SCORER_VERSION,
     EVAL_AGENT_MODEL_ID,
     EVAL_JUDGE_MODEL_ID,
 )
-from evals.braintrust.datasets import (  # noqa: E402
+from evals.config.braintrust.datasets import (  # noqa: E402
     assert_case_count_matches,
     load_dataset,
 )
-from evals.braintrust.manifest import EvalMetadata  # noqa: E402
-from evals.braintrust.scorers.common.data_privacy import (  # noqa: E402
+from evals.config.braintrust.manifest import EvalMetadata  # noqa: E402
+from evals.config.braintrust.scorers.common.data_privacy import (  # noqa: E402
     data_privacy_scorer,
 )
-from evals.braintrust.scorers.common.tool_routing import (  # noqa: E402
+from evals.config.braintrust.scorers.common.tool_routing import (  # noqa: E402
     tool_routing_correctness,
 )
-from evals.braintrust.scorers.discovery.agent_helpfulness import (  # noqa: E402
+from evals.discovery.braintrust.scorers.agent_helpfulness import (  # noqa: E402
     agent_helpfulness_scorer,
 )
-from evals.braintrust.scorers.discovery.agent_proactivity import (  # noqa: E402
+from evals.discovery.braintrust.scorers.agent_proactivity import (  # noqa: E402
     agent_proactivity_scorer,
 )
-from evals.braintrust.scorers.discovery.rag_quality import (  # noqa: E402
+from evals.discovery.braintrust.scorers.rag_quality import (  # noqa: E402
     answer_relevancy_scorer,
     context_relevancy_scorer,
     faithfulness_scorer,

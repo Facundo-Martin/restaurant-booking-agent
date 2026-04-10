@@ -18,14 +18,14 @@ from strands_evals.extractors import tools_use_extractor
 load_dotenv()
 
 # noqa: E402 — imports must come after load_dotenv() for SST resource links
-from agent import (  # noqa: E402
+from evals.config.strands.agent import (  # noqa: E402
     AGENT_MODEL,
     AGENT_RETRY_STRATEGY,
     AGENT_SYSTEM_PROMPT,
     EVAL_TOOLS,
 )
-from cases import CASES  # noqa: E402
-from evaluators import EVALUATORS  # noqa: E402
+from evals.discovery.cases import CASES  # noqa: E402
+from evals.discovery.strands.evaluators import EVALUATORS  # noqa: E402
 
 
 async def test_minimal():

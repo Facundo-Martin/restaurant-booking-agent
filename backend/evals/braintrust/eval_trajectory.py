@@ -36,18 +36,20 @@ load_dotenv()
 
 from app.agent.core import RETRY_STRATEGY, TOOLS  # noqa: E402
 from app.agent.prompt_loader import load_system_prompt_bundle  # noqa: E402
-from evals.braintrust.config import (  # noqa: E402
+from evals.config.braintrust.config import (  # noqa: E402
     BRAINTRUST_PROJECT,
     EVAL_AGENT_MODEL_ID,
     TRAJECTORY_DATASET,
     TRAJECTORY_SCORER_VERSION,
 )
-from evals.braintrust.datasets import (  # noqa: E402
+from evals.config.braintrust.datasets import (  # noqa: E402
     assert_case_count_matches,
     load_dataset,
 )
-from evals.braintrust.manifest import EvalMetadata  # noqa: E402
-from evals.braintrust.scorers.trajectory_scorer import trajectory_scorer  # noqa: E402
+from evals.config.braintrust.manifest import EvalMetadata  # noqa: E402
+from evals.config.braintrust.scorers.trajectory_scorer import (  # noqa: E402
+    trajectory_scorer,
+)
 from evals.discovery.cases import TRAJECTORY_CASES  # noqa: E402
 
 # ---------------------------------------------------------------------------
