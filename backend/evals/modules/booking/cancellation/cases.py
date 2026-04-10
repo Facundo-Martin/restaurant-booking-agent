@@ -4,7 +4,7 @@ Covers cancellation flow: agent must confirm booking ID and user intent before
 executing a cancellation. Tests that agent doesn't ask for unnecessary details.
 """
 
-from evals.additional_test_cases.common import EvalCase
+from evals.config.common import EvalCase
 
 BOOKING_CANCELLATION_OUTPUT_QUALITY_CASES: list[EvalCase] = [
     # --- Clarification: agent must ask for booking ID and confirmation ---

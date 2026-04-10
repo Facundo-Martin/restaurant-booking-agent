@@ -4,7 +4,7 @@ Covers: off-topic rejection, prompt injection, confirmation bypass attempts,
 user ID injection attacks, and other security/guardrail edge cases.
 """
 
-from evals.additional_test_cases.common import EvalCase
+from evals.config.common import EvalCase
 
 SECURITY_OUTPUT_QUALITY_CASES: list[EvalCase] = [
     # --- Safety: off-topic and prompt injection ---

@@ -106,8 +106,11 @@ CREATE TABLE documents (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Vector index (HNSW) is infrastructure-critical for KB semantic search
 CREATE INDEX doc_embedding_idx ON documents USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX doc_restaurant_idx ON documents(restaurant_name);
+
+-- Regular B-tree indexes deferred to Phase 3 (added with SQLAlchemy repository layer)
+-- TODO (Phase 3): Add index on restaurant_name for filtering queries
 ```
 
 ### `users` — User Profiles & Preferences (ORM-Managed via Alembic)
@@ -542,7 +545,8 @@ railway up
 - [ ] Create `backend/app/repositories/documents.py` (SQLAlchemy for `documents` table)
 - [ ] Implement real `retrieve_documents()` tool with pgvector similarity search
 - [ ] Create embedding utilities (`backend/app/models/embeddings.py`)
-- [ ] Test: Agent calls retrieve, gets real results from NeonDB
+- [ ] Add database indexes for query optimization (B-tree on `restaurant_name`, run via Alembic migration)
+- [ ] Test: Agent calls retrieve, gets real results from NeonDB with acceptable latency
 
 ---
 
@@ -689,6 +693,13 @@ railway up
 - **Decoupling**: Database logic separate from agent code
 - **Testability**: Mock repository for unit tests
 - **Flexibility**: Swap implementations (pgvector → Pinecone, etc.) without breaking tools
+
+### Why defer B-tree indexes to Phase 3?
+- **Vector index (HNSW) is infrastructure-critical**: Required for KB semantic search during ingestion + retrieval
+- **B-tree indexes are application-layer optimizations**: Belong with the repository implementation in Phase 3
+- **Separation of concerns**: Infra code creates the table structure; ORM handles indexing strategy
+- **Pragmatism**: By Phase 3, you'll know actual query patterns and can add indexes intelligently
+- **Low cost of deferral**: Indexes can be added anytime via Alembic migrations without breaking the system
 
 ---
 

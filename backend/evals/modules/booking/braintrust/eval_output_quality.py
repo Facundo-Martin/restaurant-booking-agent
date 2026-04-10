@@ -11,10 +11,10 @@ Run (from repo root — recommended):
 
 Run (from backend/ directory):
     # --env-file handles BRAINTRUST_API_KEY auth and SST_RESOURCE_* stubs:
-    uv run braintrust eval --env-file .env evals/braintrust/eval_output_quality.py
+    uv run braintrust eval --env-file .env evals/modules/booking/braintrust/eval_output_quality.py
 
     # Local iteration — no upload:
-    uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_output_quality.py
+    uv run braintrust eval --env-file .env --no-send-logs evals/modules/booking/braintrust/eval_output_quality.py
 """
 
 import os
@@ -49,7 +49,11 @@ from evals.config.braintrust.manifest import EvalMetadata  # noqa: E402
 from evals.config.braintrust.scorers.output_quality_scorer import (  # noqa: E402
     booking_output_quality_scorer,
 )
-from evals.discovery.cases import OUTPUT_QUALITY_CASES  # noqa: E402
+
+# TODO: OUTPUT_QUALITY_CASES not yet exported from discovery.cases — placeholder eval
+from evals.modules.discovery.cases import (  # noqa: E402
+    DISCOVERY_CASES as OUTPUT_QUALITY_CASES,
+)
 
 # ---------------------------------------------------------------------------
 # Dataset — always latest, guarded against empty results and case drift

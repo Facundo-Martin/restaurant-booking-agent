@@ -5,7 +5,7 @@ without modifying or deleting. Future cases: retrieve all bookings, retrieve
 by date range, etc.
 """
 
-from evals.additional_test_cases.common import EvalCase
+from evals.config.common import EvalCase
 
 BOOKING_RETRIEVAL_TRAJECTORY_CASES: list[EvalCase] = [
     # --- Lookup: get_booking_details must be called ---

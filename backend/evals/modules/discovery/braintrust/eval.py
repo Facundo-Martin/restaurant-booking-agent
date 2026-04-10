@@ -9,9 +9,9 @@ Run (from repo root):
     pnpm eval:braintrust:discovery
 
 Run (from backend/ directory):
-    uv run braintrust eval --env-file .env evals/braintrust/eval_discovery.py
+    uv run braintrust eval --env-file .env evals/modules/discovery/braintrust/eval.py
     # Local iteration — no upload:
-    uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_discovery.py
+    uv run braintrust eval --env-file .env --no-send-logs evals/modules/discovery/braintrust/eval.py
 """
 
 import os
@@ -47,18 +47,18 @@ from evals.config.braintrust.scorers.common.data_privacy import (  # noqa: E402
 from evals.config.braintrust.scorers.common.tool_routing import (  # noqa: E402
     tool_routing_correctness,
 )
-from evals.discovery.braintrust.scorers.agent_helpfulness import (  # noqa: E402
+from evals.modules.discovery.braintrust.scorers.agent_helpfulness import (  # noqa: E402
     agent_helpfulness_scorer,
 )
-from evals.discovery.braintrust.scorers.agent_proactivity import (  # noqa: E402
+from evals.modules.discovery.braintrust.scorers.agent_proactivity import (  # noqa: E402
     agent_proactivity_scorer,
 )
-from evals.discovery.braintrust.scorers.rag_quality import (  # noqa: E402
+from evals.modules.discovery.braintrust.scorers.rag_quality import (  # noqa: E402
     answer_relevancy_scorer,
     context_relevancy_scorer,
     faithfulness_scorer,
 )
-from evals.discovery.cases import DISCOVERY_CASES  # noqa: E402
+from evals.modules.discovery.cases import DISCOVERY_CASES  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Dataset

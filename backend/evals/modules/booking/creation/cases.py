@@ -4,7 +4,7 @@ Covers single-turn booking flow: agent asks clarifying questions, confirms
 details, and handles edge cases (past dates, out-of-range dates, etc.).
 """
 
-from evals.additional_test_cases.common import EvalCase
+from evals.config.common import EvalCase
 
 BOOKING_CREATION_OUTPUT_QUALITY_CASES: list[EvalCase] = [
     # --- Clarification: agent must ask before acting ---

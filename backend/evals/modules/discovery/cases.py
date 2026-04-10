@@ -4,7 +4,7 @@ Discovery: single-turn user queries about restaurants.
 Test coverage: basic searches, filtered searches, ambiguous queries, edge cases.
 """
 
-from evals.discovery.common import EvalCase
+from evals.config.common import EvalCase
 
 # Retrieved context (same for all test cases — simulates KB retrieval)
 _CONTEXT = (

@@ -12,10 +12,10 @@ Run (from repo root — recommended):
 
 Run (from backend/ directory):
     # --env-file handles BRAINTRUST_API_KEY auth and SST_RESOURCE_* stubs:
-    uv run braintrust eval --env-file .env evals/braintrust/eval_trajectory.py
+    uv run braintrust eval --env-file .env evals/modules/booking/braintrust/eval_trajectory.py
 
     # Local iteration — no upload:
-    uv run braintrust eval --env-file .env --no-send-logs evals/braintrust/eval_trajectory.py
+    uv run braintrust eval --env-file .env --no-send-logs evals/modules/booking/braintrust/eval_trajectory.py
 """
 
 import os
@@ -50,7 +50,11 @@ from evals.config.braintrust.manifest import EvalMetadata  # noqa: E402
 from evals.config.braintrust.scorers.trajectory_scorer import (  # noqa: E402
     trajectory_scorer,
 )
-from evals.discovery.cases import TRAJECTORY_CASES  # noqa: E402
+
+# TODO: TRAJECTORY_CASES not yet exported from discovery.cases — placeholder eval
+from evals.modules.discovery.cases import (  # noqa: E402
+    DISCOVERY_CASES as TRAJECTORY_CASES,
+)
 
 # ---------------------------------------------------------------------------
 # Dataset — always latest, guarded against empty results and case drift
