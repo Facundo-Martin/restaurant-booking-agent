@@ -1,6 +1,7 @@
 """Push the Restaurant Booking Agent system prompt to Braintrust."""
 
 import braintrust
+
 from app.agent.prompts import SYSTEM_PROMPT
 from evals.braintrust.config import (
     BRAINTRUST_PROJECT,
