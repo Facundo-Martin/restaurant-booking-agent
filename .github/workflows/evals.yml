@@ -20,8 +20,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
+      # SST resource stubs for CI/test environment
       SST_RESOURCE_Bookings: '{"name":"test-table"}'
       SST_RESOURCE_RestaurantKB: '{"id":"test-kb-id"}'
+      SST_RESOURCE_AgentSessions: '{"name":"test-sessions-bucket"}'
       AWS_REGION: us-east-1
     steps:
       - uses: actions/checkout@v4
