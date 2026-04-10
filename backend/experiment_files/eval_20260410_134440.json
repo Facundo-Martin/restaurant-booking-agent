@@ -1,0 +1,78 @@
+{
+  "timestamp": "20260410_134440",
+  "total_cases": 2,
+  "case_results": [
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The output lists all 11 restaurants from the knowledge base with zero hallucinations \u2014 all names, cuisines, hours, reservation policies, and atmosphere descriptions are accurate. The query is vague (no cuisine, price, or style preference), and the agent correctly responds by both showing all options AND asking clarifying follow-up questions (filter by cuisine/atmosphere/price, see menus, make reservations). All Score 1.0 criteria are fully met.",
+      "llm_output": "Here's a overview of all **11 restaurants** we have available:\n\n### \ud83c\udf5d Italian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Nonna's Hearth | Casual | \u2705 Accepts | Open daily |\n| Trattoria Roma | Fine Dining | \u2705 Accepts | Tue\u2013Sun |\n| Luigi's Pasta House | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd50 French\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Bistro Parisienne | Upscale | \u2705 Accepts | Closed Mondays |\n| Caf\u00e9 Laurent | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf63 Japanese\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Sakura Garden | Modern | \u2705 Accepts | Open daily |\n| Sushi Tsunami | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd57 Vegetarian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| The Garden Spot | Upscale | \u2705 Accepts | Open daily |\n| Green Bowl Caf\u00e9 | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf7d\ufe0f Other\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Late Night Eats | Casual | Walk-ins only | Open until midnight |\n| Luxe Prime Steakhouse | Premium Upscale | \u2705 Required | Closed Sundays |\n\n---\n\nWould you like to:\n- **Filter** by cuisine, atmosphere, or price range?\n- **See the menu** for a specific restaurant?\n- **Make a reservation** at any of these?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The output correctly surfaces all 3 Italian restaurants from the knowledge base (Nonna's Hearth, Trattoria Roma, Luigi's Pasta House) with accurate details: hours, atmosphere, and reservation policies all match the KB exactly. No hallucinations are present. The query (\"Show me Italian places\") specifies a cuisine, so it is not broadly vague \u2014 clarifying follow-ups are optional. The agent does offer a helpful follow-up about menus and reservations. No contradictions exist in the query. All rubric criteria for a 1.0 score are satisfied.",
+      "llm_output": "Great news \u2014 there are **3 Italian restaurants** available:\n\n| # | Restaurant | Atmosphere | Reservations | Hours |\n|---|-----------|------------|--------------|-------|\n| 1 | \ud83c\udf5d **Nonna's Hearth** | Casual | \u2705 Accepted | Open daily |\n| 2 | \ud83c\udf77 **Trattoria Roma** | Fine dining | \u2705 Accepted | Tue\u2013Sun |\n| 3 | \ud83c\udf5c **Luigi's Pasta House** | Casual | Walk-ins welcome | Open daily |\n\nHere's a quick breakdown:\n- **Nonna's Hearth** \u2013 A cozy, casual spot open every day that takes reservations.\n- **Trattoria Roma** \u2013 The upscale Italian option, perfect for a special occasion (closed Mondays).\n- **Luigi's Pasta House** \u2013 A relaxed, walk-in-friendly choice, open daily.\n\nWould you like to see a menu for any of these, or shall I help you make a reservation? \ud83c\uddee\ud83c\uddf9\n"
+    },
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The trajectory shows that the `retrieve` tool was called with a broad query (\"all restaurants\"), which is exactly what the rubric requires for a discovery query. The tool returned all 11 restaurants with names, cuisines, and hours, and the output accurately presents this information in a well-structured format. Per the rubric, score 1.0 if retrieve was called for a discovery query.",
+      "llm_output": "Here's a overview of all **11 restaurants** we have available:\n\n### \ud83c\udf5d Italian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Nonna's Hearth | Casual | \u2705 Accepts | Open daily |\n| Trattoria Roma | Fine Dining | \u2705 Accepts | Tue\u2013Sun |\n| Luigi's Pasta House | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd50 French\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Bistro Parisienne | Upscale | \u2705 Accepts | Closed Mondays |\n| Caf\u00e9 Laurent | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf63 Japanese\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Sakura Garden | Modern | \u2705 Accepts | Open daily |\n| Sushi Tsunami | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd57 Vegetarian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| The Garden Spot | Upscale | \u2705 Accepts | Open daily |\n| Green Bowl Caf\u00e9 | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf7d\ufe0f Other\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Late Night Eats | Casual | Walk-ins only | Open until midnight |\n| Luxe Prime Steakhouse | Premium Upscale | \u2705 Required | Closed Sundays |\n\n---\n\nWould you like to:\n- **Filter** by cuisine, atmosphere, or price range?\n- **See the menu** for a specific restaurant?\n- **Make a reservation** at any of these?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The retrieve tool was correctly called with the query 'Italian restaurants', satisfying the rubric requirement for discovery queries. The output accurately presents 3 Italian restaurants (Nonna's Hearth, Trattoria Roma, Luigi's Pasta House) with their names, hours, atmosphere, and reservation details \u2014 consistent with the expected output criteria of 2-5 Italian restaurants with relevant details. The trajectory matches the expected tool usage.",
+      "llm_output": "Great news \u2014 there are **3 Italian restaurants** available:\n\n| # | Restaurant | Atmosphere | Reservations | Hours |\n|---|-----------|------------|--------------|-------|\n| 1 | \ud83c\udf5d **Nonna's Hearth** | Casual | \u2705 Accepted | Open daily |\n| 2 | \ud83c\udf77 **Trattoria Roma** | Fine dining | \u2705 Accepted | Tue\u2013Sun |\n| 3 | \ud83c\udf5c **Luigi's Pasta House** | Casual | Walk-ins welcome | Open daily |\n\nHere's a quick breakdown:\n- **Nonna's Hearth** \u2013 A cozy, casual spot open every day that takes reservations.\n- **Trattoria Roma** \u2013 The upscale Italian option, perfect for a special occasion (closed Mondays).\n- **Luigi's Pasta House** \u2013 A relaxed, walk-in-friendly choice, open daily.\n\nWould you like to see a menu for any of these, or shall I help you make a reservation? \ud83c\uddee\ud83c\uddf9\n"
+    },
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Here's a overview of all **11 restaurants** we have available:\n\n### \ud83c\udf5d Italian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Nonna's Hearth | Casual | \u2705 Accepts | Open daily |\n| Trattoria Roma | Fine Dining | \u2705 Accepts | Tue\u2013Sun |\n| Luigi's Pasta House | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd50 French\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Bistro Parisienne | Upscale | \u2705 Accepts | Closed Mondays |\n| Caf\u00e9 Laurent | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf63 Japanese\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Sakura Garden | Modern | \u2705 Accepts | Open daily |\n| Sushi Tsunami | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd57 Vegetarian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| The Garden Spot | Upscale | \u2705 Accepts | Open daily |\n| Green Bowl Caf\u00e9 | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf7d\ufe0f Other\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| Late Night Eats | Casual | Walk-ins only | Open until midnight |\n| Luxe Prime Steakhouse | Premium Upscale | \u2705 Required | Closed Sundays |\n\n---\n\nWould you like to:\n- **Filter** by cuisine, atmosphere, or price range?\n- **See the menu** for a specific restaurant?\n- **Make a reservation** at any of these?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Great news \u2014 there are **3 Italian restaurants** available:\n\n| # | Restaurant | Atmosphere | Reservations | Hours |\n|---|-----------|------------|--------------|-------|\n| 1 | \ud83c\udf5d **Nonna's Hearth** | Casual | \u2705 Accepted | Open daily |\n| 2 | \ud83c\udf77 **Trattoria Roma** | Fine dining | \u2705 Accepted | Tue\u2013Sun |\n| 3 | \ud83c\udf5c **Luigi's Pasta House** | Casual | Walk-ins welcome | Open daily |\n\nHere's a quick breakdown:\n- **Nonna's Hearth** \u2013 A cozy, casual spot open every day that takes reservations.\n- **Trattoria Roma** \u2013 The upscale Italian option, perfect for a special occasion (closed Mondays).\n- **Luigi's Pasta House** \u2013 A relaxed, walk-in-friendly choice, open daily.\n\nWould you like to see a menu for any of these, or shall I help you make a reservation? \ud83c\uddee\ud83c\uddf9\n"
+    }
+  ]
+}

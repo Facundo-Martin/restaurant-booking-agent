@@ -48,6 +48,27 @@ def save_report(
             report.reasons,
             strict=True,
         ):
+            # VALIDATION: Check if reason seems related to case (simple heuristic)
+            # Flag if reason mentions specific restaurants/queries not in this case
+            reason_lower = reason.lower()
+            input_lower = case.input.lower()
+
+            # Check for obvious mismatches (e.g., "cheap AND luxurious" in reason but "Italian food" in input)
+            if "cheap" in reason_lower and "luxurious" in reason_lower:
+                if (
+                    "cheap" not in input_lower
+                    and "luxurious" not in input_lower
+                    and "contradictory" not in input_lower
+                ):
+                    print(
+                        f"⚠️  WARNING: Reason mentions 'cheap/luxurious' but case '{case.name}' input is: {case.input}"
+                    )
+            if "gluten" in reason_lower and "soy" in reason_lower:
+                if "gluten" not in input_lower and "soy" not in input_lower:
+                    print(
+                        f"⚠️  WARNING: Reason mentions 'gluten-free soy' but case '{case.name}' input is: {case.input}"
+                    )
+
             result_dict = {
                 "name": case.name,
                 "input": case.input,

@@ -13,14 +13,14 @@ from strands.models import BedrockModel
 
 from app.agent.core import RETRY_STRATEGY, SYSTEM_PROMPT, TOOLS
 
-# Agent model: Haiku for speed + cost
+# Agent model: Claude Sonnet 4.6 (strong reasoning, better throughput)
 AGENT_MODEL = BedrockModel(
-    model_id="us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    model_id="us.anthropic.claude-sonnet-4-6",
     additional_request_fields={"thinking": {"type": "disabled"}},
 )
 
-# Judge model: Claude Haiku (same as agent model for consistency and cost)
-JUDGE_MODEL = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+# Judge model: Claude Sonnet 4.6 (strong reasoning, verified 100% on discovery baseline)
+JUDGE_MODEL = "us.anthropic.claude-sonnet-4-6"
 
 # System prompt and retry strategy
 AGENT_SYSTEM_PROMPT = SYSTEM_PROMPT

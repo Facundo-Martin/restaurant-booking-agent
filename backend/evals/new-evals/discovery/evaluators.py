@@ -49,33 +49,44 @@ class PIIEvaluator(Evaluator):
 # Module-level evaluators (exported for use in eval.py)
 output_evaluator = OutputEvaluator(
     rubric=f"""
-The agent is a restaurant discovery assistant. Evaluate the response on three dimensions:
+Discovery Feature Evaluation Rubric
 
-1. AnswerRelevancy: Does it answer the user's query?
-2. Faithfulness: Does it stick to the knowledge base without hallucinating?
-3. ContextRelevancy: Is the retrieved context appropriate for the query?
+The agent is a restaurant discovery assistant. Product pattern:
+1. Show concrete restaurant options FIRST (3+ suggestions)
+2. Ask clarifying follow-ups when the user's intent is unclear
+3. Acknowledge conflicting constraints when present
+4. Stick strictly to the knowledge base (zero hallucinations)
 
-KNOWLEDGE BASE (the complete list of restaurants available):
+KNOWLEDGE BASE (complete list of available restaurants):
 {FAKE_RESTAURANTS}
 
-HALLUCINATION RULE: Any restaurant name or detail not listed above is hallucination.
-If ANY hallucination is detected, the score must be 0.0 regardless of other factors.
+EVALUATION CRITERIA:
 
-Score 1.0 if the response:
-- Directly answers the user's question
-- Only mentions restaurants from the KB above
-- No hallucinations whatsoever
-- Is clear and helpful
+Detect vagueness: Does the query lack specificity in cuisine, price range, dining style, or location?
+- If YES: Agent MUST show options AND ask clarifying questions to refine the choice
+- If NO: Agent MUST show relevant options (follow-ups optional)
 
-Score 0.5 if the response:
-- Partially answers the query
-- Mostly uses KB data correctly
-- Uses somewhat relevant context
+Detect contradictions: Does the query contain conflicting constraints (e.g., "cheap AND luxurious")?
+- If YES: Agent MUST acknowledge the tension/tradeoff explicitly
+- If NO: No acknowledgment needed
 
-Score 0.0 if the response:
-- Contains ANY hallucinated restaurants or details
-- Does not address the user's query
-- Misrepresents KB information
+Score 1.0 if ALL of these are true:
+- Response suggests 3+ restaurants from KB above (no hallucinations)
+- If query is vague: agent showed options AND asked clarifying follow-ups
+- If query has contradictions: agent acknowledged the tension
+- Response is clear, helpful, and accurate
+
+Score 0.5 if:
+- Agent showed 3+ options from KB correctly, BUT:
+  - Query was vague but agent didn't ask clarifying follow-ups
+  - Query had contradictions but agent didn't acknowledge them
+  - Suggestions lack specificity or targeted guidance
+  - Missing important details (hours, reservation policy)
+
+Score 0.0 if ANY of these are true:
+- Contains ANY hallucinated restaurants or made-up details
+- Did not address the user's query
+- Misrepresented KB information
     """,
     include_inputs=True,
     model=JUDGE_MODEL,

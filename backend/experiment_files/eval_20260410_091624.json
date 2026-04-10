@@ -1,0 +1,618 @@
+{
+  "timestamp": "20260410_091624",
+  "total_cases": 17,
+  "case_results": [
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Fully comprehensive response using all KB restaurants, direct query answering, no hallucinations, and proactive assistance.",
+      "llm_output": "I've found 11 restaurants for you! They span various cuisines including Italian, French, Japanese, Vegetarian, and more. Would you like me to help you narrow down the options? I can filter by cuisine, dining style, or help you find something specific. What sounds good to you?\n\nSome highlights:\n- For Italian: Nonna's Hearth (casual), Trattoria Roma (fine dining), Luigi's Pasta House\n- For French: Bistro Parisienne (upscale), Caf\u00e9 Laurent (casual)\n- For Japanese: Sakura Garden (modern), Sushi Tsunami (casual)\n- Vegetarian options: The Garden Spot (upscale), Green Bowl Caf\u00e9 (casual)\n- If you're looking late: Late Night Eats is open until midnight\n- For a special occasion: Luxe Prime Steakhouse offers an upscale dining experience\n\nWhat type of dining experience are you interested in today?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Perfect response matching all rubric criteria: directly answers query, uses only KB restaurants, provides clear and helpful information about Italian places.",
+      "llm_output": "I found three excellent Italian restaurants for you:\n\n1. Nonna's Hearth\n   - Atmosphere: Casual\n   - Reservation Status: Accepts reservations\n   - Open: Daily\n\n2. Trattoria Roma\n   - Atmosphere: Fine dining\n   - Reservation Status: Accepts reservations\n   - Open: Tuesday through Sunday\n\n3. Luigi's Pasta House\n   - Atmosphere: Casual\n   - Reservation Status: Walk-ins welcome\n   - Open: Daily\n\nWould you like more details about any of these Italian restaurants? I can help you check their menus or make a reservation if you're interested.\n"
+    },
+    {
+      "name": "discovery-basic-03",
+      "input": "Restaurant options?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Response perfectly matches knowledge base, directly answers query, provides comprehensive restaurant options without any hallucinations, and offers helpful additional context.",
+      "llm_output": "Great! I've found 11 restaurants with various cuisines and styles. Here's a quick overview:\n\nItalian Options:\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\nFrench Options:\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\nJapanese Options:\n- Sakura Garden (modern)\n- Sushi Tsunami (casual)\n\nVegetarian Options:\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nOther Options:\n- Late Night Eats (casual, open late)\n- Luxe Prime Steakhouse (upscale, premium)\n\nWould you like more details about any of these restaurants? I can help you explore menus, make a reservation, or refine your search by cuisine, price, or atmosphere.\n"
+    },
+    {
+      "name": "discovery-basic-04",
+      "input": "What kind of restaurants are nearby?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Perfect response: Fully answers query about nearby restaurants, uses only knowledge base restaurants without any hallucinations, and provides clear, comprehensive information across multiple cuisines and styles.",
+      "llm_output": "Great news! I've found 11 restaurants nearby with a variety of cuisines and styles. Let me break them down for you:\n\nItalian Cuisine:\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\nFrench Cuisine:\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\nJapanese Cuisine:\n- Sakura Garden (modern)\n- Sushi Tsunami (casual)\n\nVegetarian Options:\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nOther Options:\n- Late Night Eats (casual, open late)\n- Luxe Prime Steakhouse (upscale, premium)\n\nWould you like more details about any of these restaurants? I can help you find out about their menus, make a reservation, or narrow down the options based on your preferences like cuisine type, price range, or dining atmosphere.\n"
+    },
+    {
+      "name": "discovery-basic-05",
+      "input": "Tell me about available dining options",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Response comprehensively lists all 11 restaurants from the knowledge base, categorized by cuisine, with accurate details. Directly answers the query about dining options with no hallucinations.",
+      "llm_output": "Great! I've found 11 different dining options across various cuisines and styles. We have:\n\n\ud83c\udf5d Italian Restaurants (3):\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\n\ud83e\udd50 French Cuisine (2):\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\n\ud83c\udf63 Japanese Options (2):\n- Sakura Garden (modern, accepts reservations)\n- Sushi Tsunami (casual, walk-ins welcome)\n\n\ud83e\udd57 Vegetarian Choices (2):\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nAdditional Options:\n- Late Night Eats (open until midnight, affordable)\n- Luxe Prime Steakhouse (upscale, premium pricing)\n\nWould you like to:\n1. Learn more about a specific restaurant's menu?\n2. Find restaurants by cuisine type?\n3. Check availability for a reservation?\n4. Filter by atmosphere (casual/upscale) or dining style?\n\nI'm ready to help you find the perfect dining spot!\n"
+    },
+    {
+      "name": "discovery-filtered-01",
+      "input": "Show me Italian restaurants downtown",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Response fully answers query with 3 accurate Italian restaurants from knowledge base, no hallucinations, clear and helpful details.",
+      "llm_output": "Great! I found several Italian restaurants downtown for you. Here are the details:\n\n1. Nonna's Hearth\n   - Cuisine: Italian\n   - Atmosphere: Casual\n   - Reservation: Accepted\n   - Open: Daily\n\n2. Trattoria Roma\n   - Cuisine: Italian\n   - Atmosphere: Fine Dining\n   - Reservation: Accepted\n   - Open: Tuesday through Sunday\n\n3. Luigi's Pasta House\n   - Cuisine: Italian\n   - Atmosphere: Casual\n   - Reservation: Walk-ins welcome\n   - Open: Daily\n\nWould you like more information about any of these Italian restaurants? I can help you with menu details, make a reservation, or answer any questions you might have.\n"
+    },
+    {
+      "name": "discovery-filtered-02",
+      "input": "Vegetarian options in midtown",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Response perfectly matches the query, uses only knowledge base restaurants, provides clear vegetarian dining options in midtown, and offers helpful additional context without any hallucinations.",
+      "llm_output": "Great news! I found several vegetarian-friendly options in midtown. Let me highlight the dedicated vegetarian restaurants and other options with vegetarian menus:\n\nDedicated Vegetarian Restaurants:\n1. The Garden Spot (Upscale vegetarian restaurant)\n2. Green Bowl Caf\u00e9 (Casual vegetarian restaurant)\n\nRestaurants with Strong Vegetarian Options:\n3. Nonna's Hearth (Italian - likely has vegetarian pasta and appetizers)\n4. Bistro Parisienne (French - often offers vegetarian dishes)\n5. Caf\u00e9 Laurent (French - typically has vegetarian options)\n6. Sakura Garden (Japanese - usually provides vegetarian sushi and plant-based dishes)\n\nWould you like more details about any of these restaurants? I can help you browse their menus or make a reservation if you're interested. Do you have a preference for cuisine type, dining atmosphere (upscale vs. casual), or specific dietary requirements beyond vegetarian?\n"
+    },
+    {
+      "name": "discovery-filtered-03",
+      "input": "Upscale dining nearby",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Perfect match to query: provides casual late-night dining options using only knowledge base restaurants, with no hallucinations. Directly answers query with clear, helpful information.",
+      "llm_output": "Based on your request for upscale dining, I recommend these top options:\n\n\ud83c\udf1f Upscale Fine Dining Highlights:\n1. Luxe Prime Steakhouse - A premium steakhouse with upscale dining experience\n2. Bistro Parisienne - Elegant French restaurant \n3. Trattoria Roma - High-end Italian dining\n4. The Garden Spot - Upscale vegetarian restaurant\n\nTop Recommendations:\n- Luxe Prime Steakhouse offers the most traditional upscale dining experience with premium pricing and a sophisticated atmosphere.\n- Bistro Parisienne provides an elegant French dining option (note: closed on Mondays).\n- Trattoria Roma is a fine dining Italian restaurant open most of the week.\n\nWould you like more details about any of these restaurants? I can help you explore their menus, check availability, or make a reservation. Just let me know what you're most interested in!\n"
+    },
+    {
+      "name": "discovery-filtered-04",
+      "input": "Japanese restaurants with good reviews",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 0.5,
+      "test_pass": true,
+      "reason": "Response provides details on two Japanese restaurants from the knowledge base, but does not explicitly highlight their reviews or quality. Partially addresses the query with correct information.",
+      "llm_output": "Here are some more details about the Japanese restaurants:\n\nSakura Garden:\n- Cuisine: Japanese\n- Style: Modern atmosphere\n- Reservation: Recommended (accepts reservations)\n- Open daily\n\nSushi Tsunami:\n- Cuisine: Japanese\n- Style: Casual dining\n- Reservation: Walk-ins welcome\n- Open daily\n\nBoth restaurants offer Japanese cuisine and are open daily. Sakura Garden has a more modern atmosphere and recommends reservations, while Sushi Tsunami is more casual and welcomes walk-ins.\n\nWould you like more information about either of these restaurants? I can help you make a reservation or provide more details about their menus. Just let me know what you're interested in!\n"
+    },
+    {
+      "name": "discovery-filtered-05",
+      "input": "Casual dining open late",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 0.7,
+      "test_pass": true,
+      "reason": "Response provides relevant restaurant recommendations for a date from the knowledge base, offers helpful context, and asks clarifying follow-up questions. Slightly loses points for not explicitly acknowledging the query's initial ambiguity.",
+      "llm_output": "Great! I've found several casual dining options that should work well for late-night eating. Some standout choices include:\n\nCasual Late-Night Options:\n1. Late Night Eats - As the name suggests, this is perfect for late dining, open until midnight daily, walk-ins welcome, and affordable.\n2. Luigi's Pasta House - Casual Italian restaurant open daily, great for a relaxed meal.\n3. Caf\u00e9 Laurent - Casual French dining, open daily and welcoming walk-ins.\n4. Sushi Tsunami - Casual Japanese restaurant, open daily with walk-in availability.\n\nA few more relaxed options:\n- Green Bowl Caf\u00e9 (Vegetarian)\n- Sakura Garden (Japanese)\n- Nonna's Hearth (Italian)\n\nWould you like more details about any of these restaurants? I can help you check their specific menus or make a reservation if you're interested.\n"
+    },
+    {
+      "name": "discovery-ambiguous-01",
+      "input": "Something nice for a date",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Response comprehensively addresses 'best place to eat' by providing diverse restaurant options from the knowledge base, with no hallucinations. Offers proactive assistance and invites further personalization.",
+      "llm_output": "For a nice date night, I'd recommend a few standout options:\n\n1. Bistro Parisienne (French, Upscale): This looks perfect for a romantic evening. It's an upscale French restaurant that accepts reservations, which is great for a planned date night. The French cuisine typically offers a sophisticated atmosphere.\n\n2. Trattoria Roma (Italian, Fine Dining): Another excellent choice for a romantic dinner. It's a fine dining Italian restaurant that's open most of the week and takes reservations.\n\n3. Luxe Prime Steakhouse (Upscale Steakhouse): If you're looking for a premium dining experience, this could be a great option. It's upscale, requires reservations, and offers a more sophisticated setting.\n\nWould you like more details about any of these restaurants? I can help you check availability and make a reservation. Just let me know which one catches your eye, and tell me:\n- How many people will be dining?\n- What date are you thinking of?\n- Do you have any special requests or dietary preferences?\n"
+    },
+    {
+      "name": "discovery-ambiguous-02",
+      "input": "Best place to eat",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Response fully meets all criteria: directly answers query for upscale dining, uses only knowledge base restaurants without hallucinations, provides clear and helpful recommendations with accurate details.",
+      "llm_output": "Great! I've found 11 top-rated restaurants across various cuisines. Let me break down some highlights:\n\n\ud83c\udf5d Italian Options:\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\n\ud83e\udd50 French Choices:\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\n\ud83c\udf63 Japanese Selections:\n- Sakura Garden (modern)\n- Sushi Tsunami (casual)\n\n\ud83e\udd57 Vegetarian Venues:\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nWould you like me to help you narrow down these options? I can provide more details about:\n- Specific cuisines you're interested in\n- Atmosphere (casual vs. upscale)\n- Price range\n- Dietary requirements\n\nWhat sounds good to you?\n"
+    },
+    {
+      "name": "discovery-ambiguous-03",
+      "input": "Good food near here",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Response perfectly addresses the query by providing 3 authentic Italian restaurants from the knowledge base. Handled typo gracefully, offered relevant details, and showed no hallucinations.",
+      "llm_output": "Great! I've found 11 restaurants with various cuisines and dining styles. Would you like to:\n1. See more details about any of these restaurants\n2. Filter by cuisine type (Italian, French, Japanese, Vegetarian, etc.)\n3. Choose a restaurant for a reservation\n4. Explore menus\n\nWhat would you prefer? I'm ready to help you find the perfect dining experience!\n"
+    },
+    {
+      "name": "discovery-edge-01",
+      "input": "Itilian food",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 0.5,
+      "test_pass": false,
+      "reason": "Response uses correct restaurant data but fails to address the fundamental contradiction between \"cheap\" and \"luxurious\". Should have asked for clarification or suggested a compromise price point.",
+      "llm_output": "I found several Italian restaurant options for you:\n\n1. Nonna's Hearth - A casual Italian restaurant open daily\n2. Trattoria Roma - A fine dining Italian restaurant open Tuesday through Sunday\n3. Luigi's Pasta House - A casual Italian restaurant open daily that welcomes walk-ins\n\nWould you like more details about any of these restaurants? I can help you check their menus, make a reservation, or find out more information. Just let me know what you're interested in!\n"
+    },
+    {
+      "name": "discovery-edge-02",
+      "input": "Cheap AND luxurious restaurants",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 0.9,
+      "test_pass": true,
+      "reason": "Response comprehensively addresses the query using 100% accurate knowledge base information. Provides restaurant list, categorization, and proactive follow-up options. Slight deduction for not first clarifying user preferences.",
+      "llm_output": "Interesting results! Let me break down some options that might offer a balance between affordability and perceived luxury:\n\nBudget-Friendly with Nice Atmosphere:\n1. Nonna's Hearth (Italian) - Casual but with a warm, inviting atmosphere\n2. Caf\u00e9 Laurent (French) - Casual dining with potentially sophisticated flavors\n3. Sakura Garden (Japanese) - Modern setting that might feel more upscale\n\nMore Upscale Options:\n1. Trattoria Roma (Italian fine dining)\n2. Bistro Parisienne (French, upscale)\n3. The Garden Spot (Upscale vegetarian)\n\nBudget Tip: Some of these restaurants might offer:\n- Lunch specials\n- Early bird discounts\n- Tasting menus at lower prices\n- Weekday promotions\n\nWould you like me to help you explore the menus or make a reservation at any of these? I can provide more details about specific restaurants or help you find the best match for \"cheap and luxurious\" dining.\n"
+    },
+    {
+      "name": "discovery-boundary-01",
+      "input": "Any food?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Response fully addresses query about sushi with gluten-free soy sauce, uses only knowledge base restaurants, provides actionable recommendations, and shows no hallucinations.",
+      "llm_output": "Great! I found 11 different restaurants with various cuisines and styles. We have:\n- Italian options: Nonna's Hearth, Trattoria Roma, Luigi's Pasta House\n- French restaurants: Bistro Parisienne, Caf\u00e9 Laurent\n- Japanese cuisine: Sakura Garden, Sushi Tsunami\n- Vegetarian choices: The Garden Spot, Green Bowl Caf\u00e9\n- Other options: Late Night Eats (casual dining), Luxe Prime Steakhouse (upscale)\n\nWould you like to:\n1. Browse a specific cuisine?\n2. See more details about any of these restaurants?\n3. Make a reservation?\n\nFeel free to let me know what you're interested in, and I'll help you find the perfect dining option!\n"
+    },
+    {
+      "name": "discovery-boundary-02",
+      "input": "Sushi with gluten-free soy sauce near downtown",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 0.6,
+      "test_pass": true,
+      "reason": "Response lists correct restaurants but fails to clarify location context. No hallucinations, but lacks user-specific personalization.",
+      "llm_output": "While I can't definitively confirm gluten-free soy sauce from this search, I recommend:\n\n1. Call Sakura Garden or Sushi Tsunami directly to confirm their gluten-free soy sauce options\n2. Mention your dietary requirement when making a reservation\n3. Consider bringing your own gluten-free soy sauce if needed\n\nWould you like me to help you make a reservation at either Sakura Garden or Sushi Tsunami? I can assist you in booking a table and noting your gluten-free requirement.\n"
+    },
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The trajectory correctly used the 'retrieve' tool with a broad query to list all restaurants. The output comprehensively lists 11 restaurants with their details, matching the expected behavior for a discovery query about available restaurants.",
+      "llm_output": "I've found 11 restaurants for you! They span various cuisines including Italian, French, Japanese, Vegetarian, and more. Would you like me to help you narrow down the options? I can filter by cuisine, dining style, or help you find something specific. What sounds good to you?\n\nSome highlights:\n- For Italian: Nonna's Hearth (casual), Trattoria Roma (fine dining), Luigi's Pasta House\n- For French: Bistro Parisienne (upscale), Caf\u00e9 Laurent (casual)\n- For Japanese: Sakura Garden (modern), Sushi Tsunami (casual)\n- Vegetarian options: The Garden Spot (upscale), Green Bowl Caf\u00e9 (casual)\n- If you're looking late: Late Night Eats is open until midnight\n- For a special occasion: Luxe Prime Steakhouse offers an upscale dining experience\n\nWhat type of dining experience are you interested in today?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Retrieve tool was correctly called for a discovery query about Italian restaurants. The query returned relevant results matching the expected output format.",
+      "llm_output": "I found three excellent Italian restaurants for you:\n\n1. Nonna's Hearth\n   - Atmosphere: Casual\n   - Reservation Status: Accepts reservations\n   - Open: Daily\n\n2. Trattoria Roma\n   - Atmosphere: Fine dining\n   - Reservation Status: Accepts reservations\n   - Open: Tuesday through Sunday\n\n3. Luigi's Pasta House\n   - Atmosphere: Casual\n   - Reservation Status: Walk-ins welcome\n   - Open: Daily\n\nWould you like more details about any of these Italian restaurants? I can help you check their menus or make a reservation if you're interested.\n"
+    },
+    {
+      "name": "discovery-basic-03",
+      "input": "Restaurant options?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Discovery query correctly handled by calling retrieve tool to search available restaurants. Trajectory matches expected approach perfectly.",
+      "llm_output": "Great! I've found 11 restaurants with various cuisines and styles. Here's a quick overview:\n\nItalian Options:\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\nFrench Options:\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\nJapanese Options:\n- Sakura Garden (modern)\n- Sushi Tsunami (casual)\n\nVegetarian Options:\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nOther Options:\n- Late Night Eats (casual, open late)\n- Luxe Prime Steakhouse (upscale, premium)\n\nWould you like more details about any of these restaurants? I can help you explore menus, make a reservation, or refine your search by cuisine, price, or atmosphere.\n"
+    },
+    {
+      "name": "discovery-basic-04",
+      "input": "What kind of restaurants are nearby?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The trajectory correctly used the 'retrieve' tool to search for nearby restaurants, matching the expected trajectory and fulfilling the discovery query requirements.",
+      "llm_output": "Great news! I've found 11 restaurants nearby with a variety of cuisines and styles. Let me break them down for you:\n\nItalian Cuisine:\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\nFrench Cuisine:\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\nJapanese Cuisine:\n- Sakura Garden (modern)\n- Sushi Tsunami (casual)\n\nVegetarian Options:\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nOther Options:\n- Late Night Eats (casual, open late)\n- Luxe Prime Steakhouse (upscale, premium)\n\nWould you like more details about any of these restaurants? I can help you find out about their menus, make a reservation, or narrow down the options based on your preferences like cuisine type, price range, or dining atmosphere.\n"
+    },
+    {
+      "name": "discovery-basic-05",
+      "input": "Tell me about available dining options",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The trajectory correctly used the retrieve tool for a discovery query about dining options. The output comprehensively lists 11 restaurants across different cuisines and styles, matching the expected behavior of calling retrieve for a restaurant search.",
+      "llm_output": "Great! I've found 11 different dining options across various cuisines and styles. We have:\n\n\ud83c\udf5d Italian Restaurants (3):\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\n\ud83e\udd50 French Cuisine (2):\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\n\ud83c\udf63 Japanese Options (2):\n- Sakura Garden (modern, accepts reservations)\n- Sushi Tsunami (casual, walk-ins welcome)\n\n\ud83e\udd57 Vegetarian Choices (2):\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nAdditional Options:\n- Late Night Eats (open until midnight, affordable)\n- Luxe Prime Steakhouse (upscale, premium pricing)\n\nWould you like to:\n1. Learn more about a specific restaurant's menu?\n2. Find restaurants by cuisine type?\n3. Check availability for a reservation?\n4. Filter by atmosphere (casual/upscale) or dining style?\n\nI'm ready to help you find the perfect dining spot!\n"
+    },
+    {
+      "name": "discovery-filtered-01",
+      "input": "Show me Italian restaurants downtown",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Retrieve tool correctly used for restaurant discovery query. Output matches expected format with 3 Italian restaurants, including required details.",
+      "llm_output": "Great! I found several Italian restaurants downtown for you. Here are the details:\n\n1. Nonna's Hearth\n   - Cuisine: Italian\n   - Atmosphere: Casual\n   - Reservation: Accepted\n   - Open: Daily\n\n2. Trattoria Roma\n   - Cuisine: Italian\n   - Atmosphere: Fine Dining\n   - Reservation: Accepted\n   - Open: Tuesday through Sunday\n\n3. Luigi's Pasta House\n   - Cuisine: Italian\n   - Atmosphere: Casual\n   - Reservation: Walk-ins welcome\n   - Open: Daily\n\nWould you like more information about any of these Italian restaurants? I can help you with menu details, make a reservation, or answer any questions you might have.\n"
+    },
+    {
+      "name": "discovery-filtered-02",
+      "input": "Vegetarian options in midtown",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The trajectory correctly used the retrieve tool to search for vegetarian restaurants in midtown. The output matches the expectation of listing vegetarian-friendly restaurants with details. The retrieve tool was appropriately called for this discovery query.",
+      "llm_output": "Great news! I found several vegetarian-friendly options in midtown. Let me highlight the dedicated vegetarian restaurants and other options with vegetarian menus:\n\nDedicated Vegetarian Restaurants:\n1. The Garden Spot (Upscale vegetarian restaurant)\n2. Green Bowl Caf\u00e9 (Casual vegetarian restaurant)\n\nRestaurants with Strong Vegetarian Options:\n3. Nonna's Hearth (Italian - likely has vegetarian pasta and appetizers)\n4. Bistro Parisienne (French - often offers vegetarian dishes)\n5. Caf\u00e9 Laurent (French - typically has vegetarian options)\n6. Sakura Garden (Japanese - usually provides vegetarian sushi and plant-based dishes)\n\nWould you like more details about any of these restaurants? I can help you browse their menus or make a reservation if you're interested. Do you have a preference for cuisine type, dining atmosphere (upscale vs. casual), or specific dietary requirements beyond vegetarian?\n"
+    },
+    {
+      "name": "discovery-filtered-03",
+      "input": "Upscale dining nearby",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Retrieve tool was correctly used to find casual late-night dining options. The trajectory exactly matched the expected trajectory, and the output comprehensively addressed the user's query.",
+      "llm_output": "Based on your request for upscale dining, I recommend these top options:\n\n\ud83c\udf1f Upscale Fine Dining Highlights:\n1. Luxe Prime Steakhouse - A premium steakhouse with upscale dining experience\n2. Bistro Parisienne - Elegant French restaurant \n3. Trattoria Roma - High-end Italian dining\n4. The Garden Spot - Upscale vegetarian restaurant\n\nTop Recommendations:\n- Luxe Prime Steakhouse offers the most traditional upscale dining experience with premium pricing and a sophisticated atmosphere.\n- Bistro Parisienne provides an elegant French dining option (note: closed on Mondays).\n- Trattoria Roma is a fine dining Italian restaurant open most of the week.\n\nWould you like more details about any of these restaurants? I can help you explore their menus, check availability, or make a reservation. Just let me know what you're most interested in!\n"
+    },
+    {
+      "name": "discovery-filtered-04",
+      "input": "Japanese restaurants with good reviews",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The trajectory correctly used the retrieve tool multiple times to discover Japanese restaurants. While multiple retrieve calls were made, they all served the purpose of finding and verifying restaurant information, which aligns with the discovery query requirements. The output lists Japanese restaurants (Sakura Garden and Sushi Tsunami) as requested.",
+      "llm_output": "Here are some more details about the Japanese restaurants:\n\nSakura Garden:\n- Cuisine: Japanese\n- Style: Modern atmosphere\n- Reservation: Recommended (accepts reservations)\n- Open daily\n\nSushi Tsunami:\n- Cuisine: Japanese\n- Style: Casual dining\n- Reservation: Walk-ins welcome\n- Open daily\n\nBoth restaurants offer Japanese cuisine and are open daily. Sakura Garden has a more modern atmosphere and recommends reservations, while Sushi Tsunami is more casual and welcomes walk-ins.\n\nWould you like more information about either of these restaurants? I can help you make a reservation or provide more details about their menus. Just let me know what you're interested in!\n"
+    },
+    {
+      "name": "discovery-filtered-05",
+      "input": "Casual dining open late",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 0.8,
+      "test_pass": true,
+      "reason": "The trajectory correctly used the retrieve tool for a discovery query. However, the response could have been improved by explicitly acknowledging the query's ambiguity before providing recommendations. The tool use was correct, but the response lacks the suggested clarification.",
+      "llm_output": "Great! I've found several casual dining options that should work well for late-night eating. Some standout choices include:\n\nCasual Late-Night Options:\n1. Late Night Eats - As the name suggests, this is perfect for late dining, open until midnight daily, walk-ins welcome, and affordable.\n2. Luigi's Pasta House - Casual Italian restaurant open daily, great for a relaxed meal.\n3. Caf\u00e9 Laurent - Casual French dining, open daily and welcoming walk-ins.\n4. Sushi Tsunami - Casual Japanese restaurant, open daily with walk-in availability.\n\nA few more relaxed options:\n- Green Bowl Caf\u00e9 (Vegetarian)\n- Sakura Garden (Japanese)\n- Nonna's Hearth (Italian)\n\nWould you like more details about any of these restaurants? I can help you check their specific menus or make a reservation if you're interested.\n"
+    },
+    {
+      "name": "discovery-ambiguous-01",
+      "input": "Something nice for a date",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The agent successfully used the retrieve tool to find restaurant recommendations, providing a comprehensive and helpful response to the vague query about the \"best\" place to eat. The output shows nuanced understanding by offering further customization and acknowledging the subjectivity of \"best\".",
+      "llm_output": "For a nice date night, I'd recommend a few standout options:\n\n1. Bistro Parisienne (French, Upscale): This looks perfect for a romantic evening. It's an upscale French restaurant that accepts reservations, which is great for a planned date night. The French cuisine typically offers a sophisticated atmosphere.\n\n2. Trattoria Roma (Italian, Fine Dining): Another excellent choice for a romantic dinner. It's a fine dining Italian restaurant that's open most of the week and takes reservations.\n\n3. Luxe Prime Steakhouse (Upscale Steakhouse): If you're looking for a premium dining experience, this could be a great option. It's upscale, requires reservations, and offers a more sophisticated setting.\n\nWould you like more details about any of these restaurants? I can help you check availability and make a reservation. Just let me know which one catches your eye, and tell me:\n- How many people will be dining?\n- What date are you thinking of?\n- Do you have any special requests or dietary preferences?\n"
+    },
+    {
+      "name": "discovery-ambiguous-02",
+      "input": "Best place to eat",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The trajectory correctly used the retrieve tool for a discovery query about upscale dining. The tool was called with an appropriate query, and returned a list of relevant restaurants matching the user's request for upscale dining options.",
+      "llm_output": "Great! I've found 11 top-rated restaurants across various cuisines. Let me break down some highlights:\n\n\ud83c\udf5d Italian Options:\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\n\ud83e\udd50 French Choices:\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\n\ud83c\udf63 Japanese Selections:\n- Sakura Garden (modern)\n- Sushi Tsunami (casual)\n\n\ud83e\udd57 Vegetarian Venues:\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nWould you like me to help you narrow down these options? I can provide more details about:\n- Specific cuisines you're interested in\n- Atmosphere (casual vs. upscale)\n- Price range\n- Dietary requirements\n\nWhat sounds good to you?\n"
+    },
+    {
+      "name": "discovery-ambiguous-03",
+      "input": "Good food near here",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Retrieve tool correctly used for discovery query. Typo in 'Itilian' was gracefully handled by returning Italian restaurant results. Trajectory perfectly matches expected trajectory.",
+      "llm_output": "Great! I've found 11 restaurants with various cuisines and dining styles. Would you like to:\n1. See more details about any of these restaurants\n2. Filter by cuisine type (Italian, French, Japanese, Vegetarian, etc.)\n3. Choose a restaurant for a reservation\n4. Explore menus\n\nWhat would you prefer? I'm ready to help you find the perfect dining experience!\n"
+    },
+    {
+      "name": "discovery-edge-01",
+      "input": "Itilian food",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Retrieve tool was correctly used for a discovery query about restaurants. Trajectory exactly matched the expected trajectory.",
+      "llm_output": "I found several Italian restaurant options for you:\n\n1. Nonna's Hearth - A casual Italian restaurant open daily\n2. Trattoria Roma - A fine dining Italian restaurant open Tuesday through Sunday\n3. Luigi's Pasta House - A casual Italian restaurant open daily that welcomes walk-ins\n\nWould you like more details about any of these restaurants? I can help you check their menus, make a reservation, or find out more information. Just let me know what you're interested in!\n"
+    },
+    {
+      "name": "discovery-edge-02",
+      "input": "Cheap AND luxurious restaurants",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Discovery query correctly handled by calling retrieve tool. Retrieved comprehensive list of 11 restaurants across different cuisines, matching the broad nature of the input query.",
+      "llm_output": "Interesting results! Let me break down some options that might offer a balance between affordability and perceived luxury:\n\nBudget-Friendly with Nice Atmosphere:\n1. Nonna's Hearth (Italian) - Casual but with a warm, inviting atmosphere\n2. Caf\u00e9 Laurent (French) - Casual dining with potentially sophisticated flavors\n3. Sakura Garden (Japanese) - Modern setting that might feel more upscale\n\nMore Upscale Options:\n1. Trattoria Roma (Italian fine dining)\n2. Bistro Parisienne (French, upscale)\n3. The Garden Spot (Upscale vegetarian)\n\nBudget Tip: Some of these restaurants might offer:\n- Lunch specials\n- Early bird discounts\n- Tasting menus at lower prices\n- Weekday promotions\n\nWould you like me to help you explore the menus or make a reservation at any of these? I can provide more details about specific restaurants or help you find the best match for \"cheap and luxurious\" dining.\n"
+    },
+    {
+      "name": "discovery-boundary-01",
+      "input": "Any food?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Retrieve tool was correctly used for a discovery query about sushi restaurants. Two targeted searches were performed, resulting in actionable recommendations that address the location, cuisine, and dietary requirements.",
+      "llm_output": "Great! I found 11 different restaurants with various cuisines and styles. We have:\n- Italian options: Nonna's Hearth, Trattoria Roma, Luigi's Pasta House\n- French restaurants: Bistro Parisienne, Caf\u00e9 Laurent\n- Japanese cuisine: Sakura Garden, Sushi Tsunami\n- Vegetarian choices: The Garden Spot, Green Bowl Caf\u00e9\n- Other options: Late Night Eats (casual dining), Luxe Prime Steakhouse (upscale)\n\nWould you like to:\n1. Browse a specific cuisine?\n2. See more details about any of these restaurants?\n3. Make a reservation?\n\nFeel free to let me know what you're interested in, and I'll help you find the perfect dining option!\n"
+    },
+    {
+      "name": "discovery-boundary-02",
+      "input": "Sushi with gluten-free soy sauce near downtown",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "Correctly used retrieve tool for a discovery query about nearby restaurants. Retrieved 11 restaurant options and provided interactive follow-up options. Trajectory perfectly matches the expected tool usage.",
+      "llm_output": "While I can't definitively confirm gluten-free soy sauce from this search, I recommend:\n\n1. Call Sakura Garden or Sushi Tsunami directly to confirm their gluten-free soy sauce options\n2. Mention your dietary requirement when making a reservation\n3. Consider bringing your own gluten-free soy sauce if needed\n\nWould you like me to help you make a reservation at either Sakura Garden or Sushi Tsunami? I can assist you in booking a table and noting your gluten-free requirement.\n"
+    },
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "I've found 11 restaurants for you! They span various cuisines including Italian, French, Japanese, Vegetarian, and more. Would you like me to help you narrow down the options? I can filter by cuisine, dining style, or help you find something specific. What sounds good to you?\n\nSome highlights:\n- For Italian: Nonna's Hearth (casual), Trattoria Roma (fine dining), Luigi's Pasta House\n- For French: Bistro Parisienne (upscale), Caf\u00e9 Laurent (casual)\n- For Japanese: Sakura Garden (modern), Sushi Tsunami (casual)\n- Vegetarian options: The Garden Spot (upscale), Green Bowl Caf\u00e9 (casual)\n- If you're looking late: Late Night Eats is open until midnight\n- For a special occasion: Luxe Prime Steakhouse offers an upscale dining experience\n\nWhat type of dining experience are you interested in today?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "I found three excellent Italian restaurants for you:\n\n1. Nonna's Hearth\n   - Atmosphere: Casual\n   - Reservation Status: Accepts reservations\n   - Open: Daily\n\n2. Trattoria Roma\n   - Atmosphere: Fine dining\n   - Reservation Status: Accepts reservations\n   - Open: Tuesday through Sunday\n\n3. Luigi's Pasta House\n   - Atmosphere: Casual\n   - Reservation Status: Walk-ins welcome\n   - Open: Daily\n\nWould you like more details about any of these Italian restaurants? I can help you check their menus or make a reservation if you're interested.\n"
+    },
+    {
+      "name": "discovery-basic-03",
+      "input": "Restaurant options?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Great! I've found 11 restaurants with various cuisines and styles. Here's a quick overview:\n\nItalian Options:\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\nFrench Options:\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\nJapanese Options:\n- Sakura Garden (modern)\n- Sushi Tsunami (casual)\n\nVegetarian Options:\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nOther Options:\n- Late Night Eats (casual, open late)\n- Luxe Prime Steakhouse (upscale, premium)\n\nWould you like more details about any of these restaurants? I can help you explore menus, make a reservation, or refine your search by cuisine, price, or atmosphere.\n"
+    },
+    {
+      "name": "discovery-basic-04",
+      "input": "What kind of restaurants are nearby?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Great news! I've found 11 restaurants nearby with a variety of cuisines and styles. Let me break them down for you:\n\nItalian Cuisine:\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\nFrench Cuisine:\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\nJapanese Cuisine:\n- Sakura Garden (modern)\n- Sushi Tsunami (casual)\n\nVegetarian Options:\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nOther Options:\n- Late Night Eats (casual, open late)\n- Luxe Prime Steakhouse (upscale, premium)\n\nWould you like more details about any of these restaurants? I can help you find out about their menus, make a reservation, or narrow down the options based on your preferences like cuisine type, price range, or dining atmosphere.\n"
+    },
+    {
+      "name": "discovery-basic-05",
+      "input": "Tell me about available dining options",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Great! I've found 11 different dining options across various cuisines and styles. We have:\n\n\ud83c\udf5d Italian Restaurants (3):\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\n\ud83e\udd50 French Cuisine (2):\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\n\ud83c\udf63 Japanese Options (2):\n- Sakura Garden (modern, accepts reservations)\n- Sushi Tsunami (casual, walk-ins welcome)\n\n\ud83e\udd57 Vegetarian Choices (2):\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nAdditional Options:\n- Late Night Eats (open until midnight, affordable)\n- Luxe Prime Steakhouse (upscale, premium pricing)\n\nWould you like to:\n1. Learn more about a specific restaurant's menu?\n2. Find restaurants by cuisine type?\n3. Check availability for a reservation?\n4. Filter by atmosphere (casual/upscale) or dining style?\n\nI'm ready to help you find the perfect dining spot!\n"
+    },
+    {
+      "name": "discovery-filtered-01",
+      "input": "Show me Italian restaurants downtown",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Great! I found several Italian restaurants downtown for you. Here are the details:\n\n1. Nonna's Hearth\n   - Cuisine: Italian\n   - Atmosphere: Casual\n   - Reservation: Accepted\n   - Open: Daily\n\n2. Trattoria Roma\n   - Cuisine: Italian\n   - Atmosphere: Fine Dining\n   - Reservation: Accepted\n   - Open: Tuesday through Sunday\n\n3. Luigi's Pasta House\n   - Cuisine: Italian\n   - Atmosphere: Casual\n   - Reservation: Walk-ins welcome\n   - Open: Daily\n\nWould you like more information about any of these Italian restaurants? I can help you with menu details, make a reservation, or answer any questions you might have.\n"
+    },
+    {
+      "name": "discovery-filtered-02",
+      "input": "Vegetarian options in midtown",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Great news! I found several vegetarian-friendly options in midtown. Let me highlight the dedicated vegetarian restaurants and other options with vegetarian menus:\n\nDedicated Vegetarian Restaurants:\n1. The Garden Spot (Upscale vegetarian restaurant)\n2. Green Bowl Caf\u00e9 (Casual vegetarian restaurant)\n\nRestaurants with Strong Vegetarian Options:\n3. Nonna's Hearth (Italian - likely has vegetarian pasta and appetizers)\n4. Bistro Parisienne (French - often offers vegetarian dishes)\n5. Caf\u00e9 Laurent (French - typically has vegetarian options)\n6. Sakura Garden (Japanese - usually provides vegetarian sushi and plant-based dishes)\n\nWould you like more details about any of these restaurants? I can help you browse their menus or make a reservation if you're interested. Do you have a preference for cuisine type, dining atmosphere (upscale vs. casual), or specific dietary requirements beyond vegetarian?\n"
+    },
+    {
+      "name": "discovery-filtered-03",
+      "input": "Upscale dining nearby",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Based on your request for upscale dining, I recommend these top options:\n\n\ud83c\udf1f Upscale Fine Dining Highlights:\n1. Luxe Prime Steakhouse - A premium steakhouse with upscale dining experience\n2. Bistro Parisienne - Elegant French restaurant \n3. Trattoria Roma - High-end Italian dining\n4. The Garden Spot - Upscale vegetarian restaurant\n\nTop Recommendations:\n- Luxe Prime Steakhouse offers the most traditional upscale dining experience with premium pricing and a sophisticated atmosphere.\n- Bistro Parisienne provides an elegant French dining option (note: closed on Mondays).\n- Trattoria Roma is a fine dining Italian restaurant open most of the week.\n\nWould you like more details about any of these restaurants? I can help you explore their menus, check availability, or make a reservation. Just let me know what you're most interested in!\n"
+    },
+    {
+      "name": "discovery-filtered-04",
+      "input": "Japanese restaurants with good reviews",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Here are some more details about the Japanese restaurants:\n\nSakura Garden:\n- Cuisine: Japanese\n- Style: Modern atmosphere\n- Reservation: Recommended (accepts reservations)\n- Open daily\n\nSushi Tsunami:\n- Cuisine: Japanese\n- Style: Casual dining\n- Reservation: Walk-ins welcome\n- Open daily\n\nBoth restaurants offer Japanese cuisine and are open daily. Sakura Garden has a more modern atmosphere and recommends reservations, while Sushi Tsunami is more casual and welcomes walk-ins.\n\nWould you like more information about either of these restaurants? I can help you make a reservation or provide more details about their menus. Just let me know what you're interested in!\n"
+    },
+    {
+      "name": "discovery-filtered-05",
+      "input": "Casual dining open late",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Great! I've found several casual dining options that should work well for late-night eating. Some standout choices include:\n\nCasual Late-Night Options:\n1. Late Night Eats - As the name suggests, this is perfect for late dining, open until midnight daily, walk-ins welcome, and affordable.\n2. Luigi's Pasta House - Casual Italian restaurant open daily, great for a relaxed meal.\n3. Caf\u00e9 Laurent - Casual French dining, open daily and welcoming walk-ins.\n4. Sushi Tsunami - Casual Japanese restaurant, open daily with walk-in availability.\n\nA few more relaxed options:\n- Green Bowl Caf\u00e9 (Vegetarian)\n- Sakura Garden (Japanese)\n- Nonna's Hearth (Italian)\n\nWould you like more details about any of these restaurants? I can help you check their specific menus or make a reservation if you're interested.\n"
+    },
+    {
+      "name": "discovery-ambiguous-01",
+      "input": "Something nice for a date",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "For a nice date night, I'd recommend a few standout options:\n\n1. Bistro Parisienne (French, Upscale): This looks perfect for a romantic evening. It's an upscale French restaurant that accepts reservations, which is great for a planned date night. The French cuisine typically offers a sophisticated atmosphere.\n\n2. Trattoria Roma (Italian, Fine Dining): Another excellent choice for a romantic dinner. It's a fine dining Italian restaurant that's open most of the week and takes reservations.\n\n3. Luxe Prime Steakhouse (Upscale Steakhouse): If you're looking for a premium dining experience, this could be a great option. It's upscale, requires reservations, and offers a more sophisticated setting.\n\nWould you like more details about any of these restaurants? I can help you check availability and make a reservation. Just let me know which one catches your eye, and tell me:\n- How many people will be dining?\n- What date are you thinking of?\n- Do you have any special requests or dietary preferences?\n"
+    },
+    {
+      "name": "discovery-ambiguous-02",
+      "input": "Best place to eat",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Great! I've found 11 top-rated restaurants across various cuisines. Let me break down some highlights:\n\n\ud83c\udf5d Italian Options:\n- Nonna's Hearth (casual)\n- Trattoria Roma (fine dining)\n- Luigi's Pasta House (casual)\n\n\ud83e\udd50 French Choices:\n- Bistro Parisienne (upscale)\n- Caf\u00e9 Laurent (casual)\n\n\ud83c\udf63 Japanese Selections:\n- Sakura Garden (modern)\n- Sushi Tsunami (casual)\n\n\ud83e\udd57 Vegetarian Venues:\n- The Garden Spot (upscale)\n- Green Bowl Caf\u00e9 (casual)\n\nWould you like me to help you narrow down these options? I can provide more details about:\n- Specific cuisines you're interested in\n- Atmosphere (casual vs. upscale)\n- Price range\n- Dietary requirements\n\nWhat sounds good to you?\n"
+    },
+    {
+      "name": "discovery-ambiguous-03",
+      "input": "Good food near here",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Great! I've found 11 restaurants with various cuisines and dining styles. Would you like to:\n1. See more details about any of these restaurants\n2. Filter by cuisine type (Italian, French, Japanese, Vegetarian, etc.)\n3. Choose a restaurant for a reservation\n4. Explore menus\n\nWhat would you prefer? I'm ready to help you find the perfect dining experience!\n"
+    },
+    {
+      "name": "discovery-edge-01",
+      "input": "Itilian food",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "I found several Italian restaurant options for you:\n\n1. Nonna's Hearth - A casual Italian restaurant open daily\n2. Trattoria Roma - A fine dining Italian restaurant open Tuesday through Sunday\n3. Luigi's Pasta House - A casual Italian restaurant open daily that welcomes walk-ins\n\nWould you like more details about any of these restaurants? I can help you check their menus, make a reservation, or find out more information. Just let me know what you're interested in!\n"
+    },
+    {
+      "name": "discovery-edge-02",
+      "input": "Cheap AND luxurious restaurants",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Interesting results! Let me break down some options that might offer a balance between affordability and perceived luxury:\n\nBudget-Friendly with Nice Atmosphere:\n1. Nonna's Hearth (Italian) - Casual but with a warm, inviting atmosphere\n2. Caf\u00e9 Laurent (French) - Casual dining with potentially sophisticated flavors\n3. Sakura Garden (Japanese) - Modern setting that might feel more upscale\n\nMore Upscale Options:\n1. Trattoria Roma (Italian fine dining)\n2. Bistro Parisienne (French, upscale)\n3. The Garden Spot (Upscale vegetarian)\n\nBudget Tip: Some of these restaurants might offer:\n- Lunch specials\n- Early bird discounts\n- Tasting menus at lower prices\n- Weekday promotions\n\nWould you like me to help you explore the menus or make a reservation at any of these? I can provide more details about specific restaurants or help you find the best match for \"cheap and luxurious\" dining.\n"
+    },
+    {
+      "name": "discovery-boundary-01",
+      "input": "Any food?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Great! I found 11 different restaurants with various cuisines and styles. We have:\n- Italian options: Nonna's Hearth, Trattoria Roma, Luigi's Pasta House\n- French restaurants: Bistro Parisienne, Caf\u00e9 Laurent\n- Japanese cuisine: Sakura Garden, Sushi Tsunami\n- Vegetarian choices: The Garden Spot, Green Bowl Caf\u00e9\n- Other options: Late Night Eats (casual dining), Luxe Prime Steakhouse (upscale)\n\nWould you like to:\n1. Browse a specific cuisine?\n2. See more details about any of these restaurants?\n3. Make a reservation?\n\nFeel free to let me know what you're interested in, and I'll help you find the perfect dining option!\n"
+    },
+    {
+      "name": "discovery-boundary-02",
+      "input": "Sushi with gluten-free soy sauce near downtown",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "While I can't definitively confirm gluten-free soy sauce from this search, I recommend:\n\n1. Call Sakura Garden or Sushi Tsunami directly to confirm their gluten-free soy sauce options\n2. Mention your dietary requirement when making a reservation\n3. Consider bringing your own gluten-free soy sauce if needed\n\nWould you like me to help you make a reservation at either Sakura Garden or Sushi Tsunami? I can assist you in booking a table and noting your gluten-free requirement.\n"
+    }
+  ]
+}

@@ -6,7 +6,7 @@ Evaluates restaurant discovery agent on:
 - PII safety (no email/phone/card leakage)
 
 Run from backend/:
-    PYTHONPATH=. uv run python evals/new-evals/discovery/eval.py
+    PYTHONPATH=.:evals/new-evals uv run python evals/new-evals/discovery/eval.py
 
 Requires SST resource stubs:
     export SST_RESOURCE_Bookings='{"name":"test-table"}'
@@ -37,6 +37,9 @@ from agent import (  # noqa: E402
 from cases import CASES  # noqa: E402
 from evaluators import EVALUATORS  # noqa: E402
 from utils import print_summary, save_report  # noqa: E402
+
+# Quick testing: use subset of cases (comment out to run all 17)
+# CASES = CASES[:2]  # Baseline: 2 discovery-basic cases (100% pass with Sonnet 4.6)
 
 # Pass threshold for CI/CD integration
 # Can be overridden via EVAL_PASS_THRESHOLD env var (e.g., EVAL_PASS_THRESHOLD=0.95)
@@ -73,9 +76,12 @@ async def main() -> None:
     print(f"\n{'=' * 70}")
     print("Discovery Evaluation")
     print(f"{'=' * 70}\n")
-    print(f"Running {len(CASES)} cases (max 1 concurrent) ...\n", flush=True)
+    print(f"Running {len(CASES)} cases (serial) ...\n", flush=True)
 
-    # Rate limit to 1 concurrent to avoid Bedrock throttling
+    # Rate limit to 1 concurrent (serial execution).
+    # Rationale: Judge LLM can hallucinate/mix up cases if evaluators run too concurrently.
+    # Serial execution ensures judge receives clear case isolation.
+    # (Could increase to 2 later once judge context isolation improves.)
     _sem = asyncio.Semaphore(1)
     responses: dict[str, dict] = {}  # Store outputs by case name
 
@@ -83,10 +89,21 @@ async def main() -> None:
         async with _sem:
             result = await get_discovery_response(case)
             responses[case.name] = result  # Capture output for report
-            await asyncio.sleep(1)  # Delay between cases to avoid throttling
+            await asyncio.sleep(3)  # Delay between cases to avoid Bedrock throttling
             return result
 
-    reports = await experiment.run_evaluations_async(_rate_limited)
+    try:
+        reports = await experiment.run_evaluations_async(_rate_limited)
+    except Exception as e:
+        print(
+            f"\n❌ ERROR during evaluation: {type(e).__name__}: {e}",
+            file=sys.stderr,
+            flush=True,
+        )
+        import traceback
+
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(1)
 
     print("\n" + "=" * 70)
     print("RESULTS")

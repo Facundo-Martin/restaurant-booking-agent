@@ -1,0 +1,78 @@
+{
+  "timestamp": "20260410_133143",
+  "total_cases": 2,
+  "case_results": [
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 0.15,
+      "test_pass": false,
+      "reason": "The agent failed to list any specific restaurants by name. The rubric requires showing 3+ concrete restaurant suggestions from the knowledge base for both the 1.0 and 0.5 score tiers. The output only mentions general cuisine categories and the total count (11) without providing any restaurant names, hours, or reservation details. While the agent did ask clarifying follow-ups (good for a vague query), the core requirement of showing concrete options was completely missed. The expected output was to return all available restaurants with names, cuisines, and hours. Since both 1.0 and 0.5 require 3+ named options and zero were provided, this falls near 0.0, with slight credit for not hallucinating and for asking relevant follow-ups.",
+      "llm_output": "I have 11 wonderful restaurants for you to choose from! They span several cuisines including Italian, French, Japanese, Vegetarian, and more. Would you like me to help you find the perfect restaurant? I can filter by:\n- Cuisine type\n- Atmosphere (casual or upscale)\n- Reservation requirements\n- Price range\n\nWhat sounds appealing to you today?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The output lists all 3 Italian restaurants from the KB (Nonna's Hearth, Trattoria Roma, Luigi's Pasta House) with accurate details matching the knowledge base (atmosphere, reservation policy, hours). No hallucinated restaurants or made-up details. The query specifies \"Italian\" cuisine clearly, so clarifying follow-ups are optional\u2014yet the agent still offers helpful next steps (menus, reservations, more info). No contradictions to acknowledge. Response is clear, helpful, and accurate.",
+      "llm_output": "I found three excellent Italian restaurants for you:\n\n1. Nonna's Hearth\n   - Atmosphere: Casual\n   - Reservation: Accepts bookings\n   - Open: Daily\n\n2. Trattoria Roma\n   - Atmosphere: Fine dining\n   - Reservation: Accepts bookings\n   - Open: Tuesday through Sunday\n\n3. Luigi's Pasta House\n   - Atmosphere: Casual\n   - Reservation: Walk-ins welcome\n   - Open: Daily\n\nWould you like more details about any of these Italian restaurants? I can help you check their menus, make a reservation, or provide more information about each place.\n"
+    },
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The retrieve tool was correctly called for this discovery query (\"What restaurants do you have?\"), matching the expected trajectory exactly. Per the rubric, a score of 1.0 is awarded when retrieve is called for a discovery query.",
+      "llm_output": "I have 11 wonderful restaurants for you to choose from! They span several cuisines including Italian, French, Japanese, Vegetarian, and more. Would you like me to help you find the perfect restaurant? I can filter by:\n- Cuisine type\n- Atmosphere (casual or upscale)\n- Reservation requirements\n- Price range\n\nWhat sounds appealing to you today?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The input \"Show me Italian places\" is a discovery query. The retrieve tool was correctly called with 'Italian restaurants' as the query. The output returns 3 Italian restaurants (within the expected 2-5 range) with names, atmosphere details, reservation info, and hours. This fully satisfies the rubric requirement of calling retrieve for a discovery query.",
+      "llm_output": "I found three excellent Italian restaurants for you:\n\n1. Nonna's Hearth\n   - Atmosphere: Casual\n   - Reservation: Accepts bookings\n   - Open: Daily\n\n2. Trattoria Roma\n   - Atmosphere: Fine dining\n   - Reservation: Accepts bookings\n   - Open: Tuesday through Sunday\n\n3. Luigi's Pasta House\n   - Atmosphere: Casual\n   - Reservation: Walk-ins welcome\n   - Open: Daily\n\nWould you like more details about any of these Italian restaurants? I can help you check their menus, make a reservation, or provide more information about each place.\n"
+    },
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "I have 11 wonderful restaurants for you to choose from! They span several cuisines including Italian, French, Japanese, Vegetarian, and more. Would you like me to help you find the perfect restaurant? I can filter by:\n- Cuisine type\n- Atmosphere (casual or upscale)\n- Reservation requirements\n- Price range\n\nWhat sounds appealing to you today?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "I found three excellent Italian restaurants for you:\n\n1. Nonna's Hearth\n   - Atmosphere: Casual\n   - Reservation: Accepts bookings\n   - Open: Daily\n\n2. Trattoria Roma\n   - Atmosphere: Fine dining\n   - Reservation: Accepts bookings\n   - Open: Tuesday through Sunday\n\n3. Luigi's Pasta House\n   - Atmosphere: Casual\n   - Reservation: Walk-ins welcome\n   - Open: Daily\n\nWould you like more details about any of these Italian restaurants? I can help you check their menus, make a reservation, or provide more information about each place.\n"
+    }
+  ]
+}

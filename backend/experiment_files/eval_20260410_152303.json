@@ -1,0 +1,78 @@
+{
+  "timestamp": "20260410_152303",
+  "total_cases": 2,
+  "case_results": [
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The output shows all 11 restaurants from the knowledge base with complete accuracy, handles the vague query by both showing options AND asking clarifying follow-ups, contains zero hallucinations, and presents information in a clear, helpful format with comprehensive details.",
+      "llm_output": "Here's a full overview of our available restaurants:\n\n### \ud83c\udf5d Italian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Nonna's Hearth** | Casual | \u2705 Accepted | Open daily |\n| **Trattoria Roma** | Fine Dining | \u2705 Accepted | Tue\u2013Sun |\n| **Luigi's Pasta House** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd50 French\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Bistro Parisienne** | Upscale | \u2705 Accepted | Tue\u2013Sun |\n| **Caf\u00e9 Laurent** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf63 Japanese\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Sakura Garden** | Modern | \u2705 Accepted | Open daily |\n| **Sushi Tsunami** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd57 Vegetarian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **The Garden Spot** | Upscale | \u2705 Accepted | Open daily |\n| **Green Bowl Caf\u00e9** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf7d\ufe0f Other\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Late Night Eats** | Casual/Affordable | Walk-ins only | Until midnight daily |\n| **Luxe Prime Steakhouse** | Premium Upscale | \u2705 Required | Mon\u2013Sat |\n\n---\n\nWe have **11 restaurants** spanning Italian, French, Japanese, Vegetarian, and more! Would you like to:\n- **Filter** by cuisine, atmosphere, or price?\n- **See the menu** for a specific restaurant?\n- **Make a reservation** at one of them?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "OutputEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The output perfectly meets all criteria: shows 3+ Italian restaurants from the knowledge base (Nonna's Hearth, Trattoria Roma, Luigi's Pasta House), provides accurate details including hours and reservation policies, contains no hallucinations, and includes helpful clarifying follow-ups asking if the user wants more details or reservations.",
+      "llm_output": "Here are the Italian restaurants available:\n\n1. **Nonna's Hearth** \ud83c\udf5d\n   - Casual atmosphere | Open daily | Accepts reservations\n\n2. **Trattoria Roma** \ud83c\udf77\n   - Fine dining | Open Tuesday\u2013Sunday | Accepts reservations\n\n3. **Luigi's Pasta House** \ud83c\udf55\n   - Casual | Open daily | Walk-ins welcome\n\nWould you like more details on any of these \u2014 such as menus, pricing, or availability? Or would you like to make a reservation at one of them?\n"
+    },
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The input \"What restaurants do you have?\" is a discovery query asking for restaurant information. The trajectory correctly shows the retrieve tool was called with query \"all restaurants\", which is exactly what the rubric requires for discovery queries. The system properly identified this as a knowledge base search task and used the appropriate tool to retrieve restaurant data.",
+      "llm_output": "Here's a full overview of our available restaurants:\n\n### \ud83c\udf5d Italian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Nonna's Hearth** | Casual | \u2705 Accepted | Open daily |\n| **Trattoria Roma** | Fine Dining | \u2705 Accepted | Tue\u2013Sun |\n| **Luigi's Pasta House** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd50 French\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Bistro Parisienne** | Upscale | \u2705 Accepted | Tue\u2013Sun |\n| **Caf\u00e9 Laurent** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf63 Japanese\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Sakura Garden** | Modern | \u2705 Accepted | Open daily |\n| **Sushi Tsunami** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd57 Vegetarian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **The Garden Spot** | Upscale | \u2705 Accepted | Open daily |\n| **Green Bowl Caf\u00e9** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf7d\ufe0f Other\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Late Night Eats** | Casual/Affordable | Walk-ins only | Until midnight daily |\n| **Luxe Prime Steakhouse** | Premium Upscale | \u2705 Required | Mon\u2013Sat |\n\n---\n\nWe have **11 restaurants** spanning Italian, French, Japanese, Vegetarian, and more! Would you like to:\n- **Filter** by cuisine, atmosphere, or price?\n- **See the menu** for a specific restaurant?\n- **Make a reservation** at one of them?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "TrajectoryEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "The input \"Show me Italian places\" is clearly a discovery query for Italian restaurants. The trajectory correctly shows that the retrieve tool was called with the appropriate query 'Italian restaurants'. According to the rubric, discovery queries that call the retrieve tool should receive a score of 1.0. The tool was used appropriately and returned relevant data that was properly formatted in the output.",
+      "llm_output": "Here are the Italian restaurants available:\n\n1. **Nonna's Hearth** \ud83c\udf5d\n   - Casual atmosphere | Open daily | Accepts reservations\n\n2. **Trattoria Roma** \ud83c\udf77\n   - Fine dining | Open Tuesday\u2013Sunday | Accepts reservations\n\n3. **Luigi's Pasta House** \ud83c\udf55\n   - Casual | Open daily | Walk-ins welcome\n\nWould you like more details on any of these \u2014 such as menus, pricing, or availability? Or would you like to make a reservation at one of them?\n"
+    },
+    {
+      "name": "discovery-basic-01",
+      "input": "What restaurants do you have?",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Here's a full overview of our available restaurants:\n\n### \ud83c\udf5d Italian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Nonna's Hearth** | Casual | \u2705 Accepted | Open daily |\n| **Trattoria Roma** | Fine Dining | \u2705 Accepted | Tue\u2013Sun |\n| **Luigi's Pasta House** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd50 French\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Bistro Parisienne** | Upscale | \u2705 Accepted | Tue\u2013Sun |\n| **Caf\u00e9 Laurent** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf63 Japanese\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Sakura Garden** | Modern | \u2705 Accepted | Open daily |\n| **Sushi Tsunami** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83e\udd57 Vegetarian\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **The Garden Spot** | Upscale | \u2705 Accepted | Open daily |\n| **Green Bowl Caf\u00e9** | Casual | Walk-ins welcome | Open daily |\n\n### \ud83c\udf7d\ufe0f Other\n| Restaurant | Atmosphere | Reservations | Hours |\n|---|---|---|---|\n| **Late Night Eats** | Casual/Affordable | Walk-ins only | Until midnight daily |\n| **Luxe Prime Steakhouse** | Premium Upscale | \u2705 Required | Mon\u2013Sat |\n\n---\n\nWe have **11 restaurants** spanning Italian, French, Japanese, Vegetarian, and more! Would you like to:\n- **Filter** by cuisine, atmosphere, or price?\n- **See the menu** for a specific restaurant?\n- **Make a reservation** at one of them?\n"
+    },
+    {
+      "name": "discovery-basic-02",
+      "input": "Show me Italian places",
+      "expected_trajectory": [
+        "retrieve"
+      ],
+      "evaluator": "PIIEvaluator",
+      "score": 1.0,
+      "test_pass": true,
+      "reason": "No PII detected",
+      "llm_output": "Here are the Italian restaurants available:\n\n1. **Nonna's Hearth** \ud83c\udf5d\n   - Casual atmosphere | Open daily | Accepts reservations\n\n2. **Trattoria Roma** \ud83c\udf77\n   - Fine dining | Open Tuesday\u2013Sunday | Accepts reservations\n\n3. **Luigi's Pasta House** \ud83c\udf55\n   - Casual | Open daily | Walk-ins welcome\n\nWould you like more details on any of these \u2014 such as menus, pricing, or availability? Or would you like to make a reservation at one of them?\n"
+    }
+  ]
+}
