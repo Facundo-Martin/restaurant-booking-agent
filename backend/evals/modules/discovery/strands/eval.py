@@ -38,7 +38,7 @@ from evals.config.strands.utils import (  # noqa: E402
     print_summary,
     save_report,
 )
-from evals.modules.discovery.cases import CASES  # noqa: E402
+from evals.modules.discovery.cases import DISCOVERY_CASES as CASES  # noqa: E402
 from evals.modules.discovery.strands.evaluators import EVALUATORS  # noqa: E402
 
 # Quick testing: use subset of cases (comment out to run all 17)

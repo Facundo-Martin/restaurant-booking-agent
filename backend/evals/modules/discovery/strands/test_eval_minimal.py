@@ -24,7 +24,7 @@ from evals.config.strands.agent import (  # noqa: E402
     AGENT_SYSTEM_PROMPT,
     EVAL_TOOLS,
 )
-from evals.modules.discovery.cases import CASES  # noqa: E402
+from evals.modules.discovery.cases import DISCOVERY_CASES as CASES  # noqa: E402
 from evals.modules.discovery.strands.evaluators import EVALUATORS  # noqa: E402
 
 
